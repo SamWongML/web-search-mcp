@@ -227,8 +227,8 @@ class Crawl4AIScraper:
 
             dispatcher = MemoryAdaptiveDispatcher(
                 max_session_permit=max_concurrent,
-                max_session_permit_percent=0.8,
-                monitor_interval=1.0,
+                memory_threshold_percent=80.0,
+                check_interval=1.0,
             )
 
             raw_results = await self._crawler.arun_many(
