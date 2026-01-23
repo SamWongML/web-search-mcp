@@ -108,7 +108,7 @@ async def root(_request: Request) -> JSONResponse:
 middleware = [
     Middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.get_cors_origins(),
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["Mcp-Session-Id"],  # Required for MCP sessions

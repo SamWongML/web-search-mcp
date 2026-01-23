@@ -1,6 +1,5 @@
 """Application settings loaded from environment variables."""
 
-from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,15 +25,11 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # CORS (comma-separated origins or "*")
-    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
+    cors_origins: str = "*"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
-        """Parse CORS origins from comma-separated string or list."""
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+    def get_cors_origins(self) -> list[str]:
+        """Get CORS origins as a list (parsed from comma-separated string)."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # ─── Search Provider API Keys ────────────────────────────────────
     serpapi_key: str | None = None
