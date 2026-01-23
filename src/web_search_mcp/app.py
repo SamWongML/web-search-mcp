@@ -126,7 +126,8 @@ app = Starlette(
         Route("/ready", readiness_check, methods=["GET"]),
         Route("/alive", liveness_check, methods=["GET"]),
         # MCP endpoint - Streamable HTTP
-        Mount("/mcp", app=mcp.streamable_http_app()),
+        # Note: streamable_http_app() creates routes at /mcp internally
+        Mount("/", app=mcp.streamable_http_app()),
     ],
     middleware=middleware,
     lifespan=lifespan,
