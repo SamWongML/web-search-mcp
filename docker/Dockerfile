@@ -16,7 +16,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy dependency files first for layer caching
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 
 # Create lock file and install dependencies
 RUN uv lock --no-cache
@@ -91,5 +91,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 # Expose port
 EXPOSE 8000
 
-# Run the server
-CMD ["uvicorn", "web_search_mcp.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the server using python -m to avoid shebang path issues
+CMD ["python", "-m", "uvicorn", "web_search_mcp.app:app", "--host", "0.0.0.0", "--port", "8000"]

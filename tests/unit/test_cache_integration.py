@@ -9,14 +9,9 @@ Tests the cache in realistic scenarios including:
 """
 
 import asyncio
-import time
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from web_search_mcp.models.common import Metadata
-from web_search_mcp.models.scrape import ScrapeResult
-from web_search_mcp.models.search import SearchResponse, SearchResult
 from web_search_mcp.utils.cache import LRUCache, ResponseCache
 
 
@@ -289,9 +284,7 @@ class TestCacheToolIntegration:
         # Simulate search response
         response = {
             "query": query,
-            "results": [
-                {"title": "Python.org", "url": "https://python.org", "position": 1}
-            ],
+            "results": [{"title": "Python.org", "url": "https://python.org", "position": 1}],
             "provider": "duckduckgo",
             "search_time_ms": 150.0,
         }

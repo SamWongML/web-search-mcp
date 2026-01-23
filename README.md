@@ -4,7 +4,7 @@ A lightweight, high-performance Model Context Protocol (MCP) server for web sear
 
 ## Features
 
-- **Multiple Search Providers**: SerpAPI, Google Custom Search, Brave Search, DuckDuckGo
+- **Multiple Search Providers**: SerpAPI, Tavily Search, Brave Search, DuckDuckGo
 - **Automatic Fallback**: Seamlessly falls back to next provider on failure
 - **Web Scraping**: Extract clean markdown from any webpage
 - **Batch Operations**: Scrape multiple URLs concurrently
@@ -49,8 +49,7 @@ cp .env.example .env
 | `PORT` | `8000` | Server port |
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `SERPAPI_API_KEY` | - | SerpAPI key (optional) |
-| `GOOGLE_API_KEY` | - | Google API key (optional) |
-| `GOOGLE_CSE_ID` | - | Google Custom Search Engine ID |
+| `TAVILY_API_KEY` | - | Tavily Search API key (optional) |
 | `BRAVE_API_KEY` | - | Brave Search API key (optional) |
 | `SCRAPER_TYPE` | `trafilatura` | Scraper: `trafilatura`, `crawl4ai`, `jina` |
 | `CACHE_TTL_SECONDS` | `300` | Cache time-to-live |
@@ -158,7 +157,7 @@ src/web_search_mcp/
 ├── models/          # Pydantic data models
 ├── providers/       # Search provider implementations
 │   ├── serpapi.py
-│   ├── google_cse.py
+│   ├── tavily.py
 │   ├── brave.py
 │   └── duckduckgo.py
 ├── scrapers/        # Web scraper implementations
@@ -176,7 +175,7 @@ src/web_search_mcp/
 Providers are tried in order until one succeeds:
 
 1. **SerpAPI** (requires `SERPAPI_API_KEY`)
-2. **Google CSE** (requires `GOOGLE_API_KEY` + `GOOGLE_CSE_ID`)
+2. **Tavily Search** (requires `TAVILY_API_KEY`)
 3. **Brave Search** (requires `BRAVE_API_KEY`)
 4. **DuckDuckGo** (no API key required, fallback)
 
@@ -258,7 +257,7 @@ docker build -f docker/Dockerfile -t web-search-mcp:latest .
 | Provider | Free Tier |
 |----------|-----------|
 | SerpAPI | 100/month |
-| Google CSE | 100/day |
+| Tavily | 1,000/month |
 | Brave Search | 2000/month |
 | DuckDuckGo | Unlimited (unofficial) |
 

@@ -146,8 +146,12 @@ class Crawl4AIScraper:
             # Extract links if requested
             links: list[Link] = []
             if options.include_links and hasattr(result, "links"):
-                internal = result.links.get("internal", []) if isinstance(result.links, dict) else []
-                external = result.links.get("external", []) if isinstance(result.links, dict) else []
+                internal = (
+                    result.links.get("internal", []) if isinstance(result.links, dict) else []
+                )
+                external = (
+                    result.links.get("external", []) if isinstance(result.links, dict) else []
+                )
 
                 for link_data in internal + external:
                     if isinstance(link_data, dict):
@@ -163,7 +167,9 @@ class Crawl4AIScraper:
             # Extract images if requested
             images: list[Image] = []
             if options.include_images and hasattr(result, "media"):
-                media_images = result.media.get("images", []) if isinstance(result.media, dict) else []
+                media_images = (
+                    result.media.get("images", []) if isinstance(result.media, dict) else []
+                )
                 for img_data in media_images:
                     if isinstance(img_data, dict):
                         images.append(

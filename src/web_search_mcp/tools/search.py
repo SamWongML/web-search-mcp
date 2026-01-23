@@ -19,7 +19,7 @@ def register(mcp: FastMCP) -> None:
 
         Uses multiple search providers with automatic fallback:
         1. SerpAPI (if configured)
-        2. Google Custom Search (if configured)
+        2. Tavily Search (if configured)
         3. Brave Search (if configured)
         4. DuckDuckGo (always available)
 

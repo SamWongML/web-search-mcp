@@ -47,7 +47,7 @@ The codebase uses a **protocol-based layered architecture**:
 
 **Protocol-based abstractions**: `SearchProvider` and `Scraper` are Python protocols (`providers/base.py`, `scrapers/base.py`). Add new providers/scrapers by implementing these protocols.
 
-**Automatic provider fallback**: `ProviderRegistry` (`providers/registry.py`) tries providers in priority order (SerpAPI → Google CSE → Brave → DuckDuckGo) with exponential backoff for failing providers.
+**Automatic provider fallback**: `ProviderRegistry` (`providers/registry.py`) tries providers in priority order (SerpAPI → Tavily → Brave → DuckDuckGo) with exponential backoff for failing providers.
 
 **Lifespan-managed resources**: `AppContext` in `server.py` manages shared resources (HTTP client, cache, rate limiters) via FastMCP's lifespan context.
 

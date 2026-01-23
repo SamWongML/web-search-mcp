@@ -18,8 +18,7 @@ services:
 
       # Search Provider API Keys (from .env or environment)
       - WEBSEARCH_SERPAPI_KEY=${SERPAPI_KEY:-}
-      - WEBSEARCH_GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - WEBSEARCH_GOOGLE_CX=${GOOGLE_CX:-}
+      - WEBSEARCH_TAVILY_API_KEY=${TAVILY_API_KEY:-}
       - WEBSEARCH_BRAVE_API_KEY=${BRAVE_API_KEY:-}
       - WEBSEARCH_JINA_API_KEY=${JINA_API_KEY:-}
 

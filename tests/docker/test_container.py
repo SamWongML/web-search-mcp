@@ -56,9 +56,12 @@ def docker_image_built():
     # Build the image
     result = subprocess.run(
         [
-            "docker", "build",
-            "-f", str(dockerfile_path),
-            "-t", "web-search-mcp:test",
+            "docker",
+            "build",
+            "-f",
+            str(dockerfile_path),
+            "-t",
+            "web-search-mcp:test",
             str(project_root),
         ],
         capture_output=True,
@@ -159,7 +162,8 @@ class TestContainerMCP:
         )
 
         # Should get a response (even if error due to stateless mode)
-        assert response.status_code in [200, 400, 500]
+        # 406 is returned for content negotiation issues with MCP
+        assert response.status_code in [200, 400, 406, 500]
 
 
 @pytest.mark.docker
@@ -196,7 +200,8 @@ class TestContainerResilience:
         )
 
         # Should return error, not crash
-        assert response.status_code in [400, 500]
+        # 406 is returned for content negotiation issues with MCP
+        assert response.status_code in [400, 406, 500]
 
 
 @pytest.mark.docker

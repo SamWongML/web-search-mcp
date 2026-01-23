@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 import structlog
 
+from web_search_mcp.config import settings
 from web_search_mcp.exceptions import (
     ProviderAPIError,
     ProviderRateLimitError,
@@ -62,7 +63,10 @@ class SerpAPIProvider:
         """Get or create HTTP client."""
         if self._http_client is not None:
             return self._http_client
-        return httpx.AsyncClient(timeout=30.0)
+        return httpx.AsyncClient(
+            timeout=30.0,
+            verify=settings.get_ssl_context(),
+        )
 
     async def search(
         self,

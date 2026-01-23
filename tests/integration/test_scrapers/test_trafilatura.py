@@ -36,9 +36,7 @@ class TestTrafilaturaScraper:
     @respx.mock
     async def test_scrape_http_error(self, scraper):
         """Test scrape with HTTP error."""
-        respx.get("https://example.com/error").mock(
-            return_value=Response(404, text="Not Found")
-        )
+        respx.get("https://example.com/error").mock(return_value=Response(404, text="Not Found"))
 
         result = await scraper.scrape("https://example.com/error")
 
@@ -49,9 +47,7 @@ class TestTrafilaturaScraper:
     @respx.mock
     async def test_scrape_connection_error(self, scraper):
         """Test scrape with connection error."""
-        respx.get("https://example.com/timeout").mock(
-            side_effect=Exception("Connection timeout")
-        )
+        respx.get("https://example.com/timeout").mock(side_effect=Exception("Connection timeout"))
 
         result = await scraper.scrape("https://example.com/timeout")
 
@@ -98,9 +94,7 @@ class TestTrafilaturaScraper:
         respx.get("https://example.com/page2").mock(
             return_value=Response(200, text="<html><body><h1>Page 2</h1></body></html>")
         )
-        respx.get("https://example.com/page3").mock(
-            return_value=Response(404, text="Not Found")
-        )
+        respx.get("https://example.com/page3").mock(return_value=Response(404, text="Not Found"))
 
         urls = [
             "https://example.com/page1",
@@ -128,9 +122,7 @@ class TestTrafilaturaScraper:
         </body>
         </html>
         """
-        respx.get("https://example.com/").mock(
-            return_value=Response(200, text=html)
-        )
+        respx.get("https://example.com/").mock(return_value=Response(200, text=html))
 
         result = await scraper.discover_urls("https://example.com/", max_urls=10)
 

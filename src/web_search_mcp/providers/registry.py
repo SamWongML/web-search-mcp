@@ -180,9 +180,7 @@ class ProviderRegistry:
             elapsed_ms=elapsed_ms,
         )
 
-        raise AllProvidersExhaustedError(
-            f"All search providers failed. Errors: {error_summary}"
-        )
+        raise AllProvidersExhaustedError(f"All search providers failed. Errors: {error_summary}")
 
     def _get_provider_order(self, preferred: str | None) -> list[SearchProvider]:
         """Get providers in order, with preferred provider first if specified."""

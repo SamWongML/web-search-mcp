@@ -40,7 +40,7 @@ def test_settings():
         debug=True,
         log_level="DEBUG",
         serpapi_key=None,
-        google_api_key=None,
+        tavily_api_key=None,
         brave_api_key=None,
         cache_enabled=False,
     )
@@ -54,8 +54,7 @@ def mock_settings():
     return Settings(
         debug=True,
         serpapi_key="test-serpapi-key",
-        google_api_key="test-google-key",
-        google_cx="test-cx-id",
+        tavily_api_key="tvly-test-key",
         brave_api_key="test-brave-key",
         jina_api_key="test-jina-key",
         cache_enabled=False,
@@ -99,14 +98,11 @@ def serpapi_provider(mock_settings):
 
 
 @pytest.fixture
-def google_cse_provider(mock_settings):
-    """Google CSE provider with mock settings."""
-    from web_search_mcp.providers.google_cse import GoogleCSEProvider
+def tavily_provider(mock_settings):
+    """Tavily provider with mock settings."""
+    from web_search_mcp.providers.tavily import TavilyProvider
 
-    return GoogleCSEProvider(
-        api_key=mock_settings.google_api_key,
-        cx=mock_settings.google_cx,
-    )
+    return TavilyProvider(api_key=mock_settings.tavily_api_key)
 
 
 @pytest.fixture
@@ -189,23 +185,25 @@ def sample_serpapi_response() -> dict:
 
 
 @pytest.fixture
-def sample_google_cse_response() -> dict:
-    """Sample Google CSE response for mocking."""
+def sample_tavily_response() -> dict:
+    """Sample Tavily response for mocking."""
     return {
-        "items": [
+        "query": "python programming",
+        "results": [
             {
                 "title": "Python.org",
-                "link": "https://www.python.org/",
-                "snippet": "The official home of Python.",
-                "displayLink": "www.python.org",
+                "url": "https://www.python.org/",
+                "content": "The official home of Python.",
+                "score": 0.95,
             },
             {
                 "title": "Python Tutorial",
-                "link": "https://docs.python.org/",
-                "snippet": "Python documentation.",
-                "displayLink": "docs.python.org",
+                "url": "https://docs.python.org/",
+                "content": "Python documentation.",
+                "score": 0.90,
             },
-        ]
+        ],
+        "response_time": 0.5,
     }
 
 

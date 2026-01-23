@@ -46,9 +46,7 @@ class DuckDuckGoProvider:
         try:
             from ddgs import DDGS
         except ImportError as e:
-            raise ProviderAPIError(
-                self.name, 500, f"ddgs library not installed: {e}"
-            ) from e
+            raise ProviderAPIError(self.name, 500, f"ddgs library not installed: {e}") from e
         return DDGS()
 
     async def search(
@@ -109,9 +107,7 @@ class DuckDuckGoProvider:
             logger.warning("duckduckgo_error", error=str(e))
             raise ProviderAPIError(self.name, 500, str(e)) from e
 
-    def _parse_results(
-        self, raw_results: list[dict], max_results: int
-    ) -> list[SearchResult]:
+    def _parse_results(self, raw_results: list[dict], max_results: int) -> list[SearchResult]:
         """Parse DuckDuckGo results into SearchResult objects."""
         results: list[SearchResult] = []
 

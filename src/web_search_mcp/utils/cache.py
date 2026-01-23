@@ -114,9 +114,7 @@ class LRUCache(Generic[T]):
 
         async with self._lock:
             expired_keys = [
-                key
-                for key, (_, timestamp) in self._cache.items()
-                if self._is_expired(timestamp)
+                key for key, (_, timestamp) in self._cache.items() if self._is_expired(timestamp)
             ]
             for key in expired_keys:
                 del self._cache[key]

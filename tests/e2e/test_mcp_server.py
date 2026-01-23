@@ -92,9 +92,7 @@ class TestMCPToolsIntegration:
         return cache
 
     @pytest.mark.asyncio
-    async def test_web_search_tool_call(
-        self, mock_provider_registry, mock_cache
-    ):
+    async def test_web_search_tool_call(self, mock_provider_registry, mock_cache):
         """Test web_search tool with mocked dependencies."""
         from web_search_mcp.models.search import SearchResponse
 

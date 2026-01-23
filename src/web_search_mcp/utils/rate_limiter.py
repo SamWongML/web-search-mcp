@@ -202,9 +202,10 @@ class MultiProviderRateLimiter:
             window_seconds=3600,
         )
 
-        # Google CSE: X requests per day
-        self._limiters["google_cse"] = SlidingWindowLimiter(
-            max_requests=settings.google_cse_requests_per_day,
+        # Tavily: X requests per month (approximated as daily limit)
+        # 1000/month ≈ 33/day
+        self._limiters["tavily"] = SlidingWindowLimiter(
+            max_requests=max(1, settings.tavily_requests_per_month // 30),
             window_seconds=86400,
         )
 

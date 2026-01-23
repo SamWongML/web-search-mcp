@@ -1,6 +1,5 @@
 """Unit tests for markdown utilities."""
 
-
 from web_search_mcp.utils.markdown import (
     clean_markdown,
     decode_html_entities,

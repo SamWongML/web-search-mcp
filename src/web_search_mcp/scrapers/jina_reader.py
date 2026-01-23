@@ -5,6 +5,7 @@ import time
 import httpx
 import structlog
 
+from web_search_mcp.config import settings
 from web_search_mcp.models.common import Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
 from web_search_mcp.utils.markdown import clean_markdown
@@ -52,7 +53,10 @@ class JinaReaderScraper:
         """Get or create HTTP client."""
         if self._http_client is not None:
             return self._http_client
-        return httpx.AsyncClient(timeout=float(self._timeout))
+        return httpx.AsyncClient(
+            timeout=float(self._timeout),
+            verify=settings.get_ssl_context(),
+        )
 
     async def scrape(
         self,
@@ -169,6 +173,7 @@ class JinaReaderScraper:
 
         async with anyio.create_task_group() as tg:
             for url in urls:
+
                 async def do_scrape(u: str) -> None:
                     result = await scrape_with_semaphore(u)
                     results.append(result)

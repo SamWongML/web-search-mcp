@@ -45,13 +45,24 @@ def create_providers(http_client: httpx.AsyncClient) -> list:
     """
     from web_search_mcp.providers.brave import BraveProvider
     from web_search_mcp.providers.duckduckgo import DuckDuckGoProvider
-    from web_search_mcp.providers.google_cse import GoogleCSEProvider
     from web_search_mcp.providers.serpapi import SerpAPIProvider
+    from web_search_mcp.providers.tavily import TavilyProvider
 
     providers = []
 
     # Add providers in priority order
-    # SerpAPI first (best quality)
+    # Tavily first (high quality AI-optimized search)
+    providers.append(
+        TavilyProvider(
+            api_key=settings.tavily_api_key,
+            http_client=http_client,
+        )
+    )
+
+    # DuckDuckGo second (always available, no API key)
+    providers.append(DuckDuckGoProvider())
+
+    # SerpAPI third
     providers.append(
         SerpAPIProvider(
             api_key=settings.serpapi_key,
@@ -59,25 +70,13 @@ def create_providers(http_client: httpx.AsyncClient) -> list:
         )
     )
 
-    # Google Custom Search second
-    providers.append(
-        GoogleCSEProvider(
-            api_key=settings.google_api_key,
-            cx=settings.google_cx,
-            http_client=http_client,
-        )
-    )
-
-    # Brave third
+    # Brave fourth
     providers.append(
         BraveProvider(
             api_key=settings.brave_api_key,
             http_client=http_client,
         )
     )
-
-    # DuckDuckGo last (always available, no API key)
-    providers.append(DuckDuckGoProvider())
 
     return providers
 
@@ -124,7 +123,13 @@ async def app_lifespan(_server: FastMCP) -> AsyncIterator[AppContext]:
         debug=settings.debug,
     )
 
-    # HTTP client with connection pooling
+    # HTTP client with connection pooling and SSL configuration
+    ssl_verify = settings.get_ssl_context()
+    logger.info(
+        "configuring_http_client",
+        ssl_verify=ssl_verify if isinstance(ssl_verify, bool) else "custom_ca",
+    )
+
     http_client = httpx.AsyncClient(
         limits=httpx.Limits(
             max_connections=settings.max_connections,
@@ -138,6 +143,7 @@ async def app_lifespan(_server: FastMCP) -> AsyncIterator[AppContext]:
         ),
         http2=True,
         follow_redirects=True,
+        verify=ssl_verify,
     )
 
     # Search providers with fallback chain

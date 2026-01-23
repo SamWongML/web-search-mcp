@@ -31,7 +31,10 @@ class HealthChecker:
         """Check if HTTP client can make requests."""
         start = time.monotonic()
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(
+                timeout=5.0,
+                verify=settings.get_ssl_context(),
+            ) as client:
                 response = await client.head("https://www.google.com")
                 latency_ms = (time.monotonic() - start) * 1000
 
@@ -56,8 +59,8 @@ class HealthChecker:
 
         if settings.is_serpapi_configured():
             configured_providers.append("serpapi")
-        if settings.is_google_cse_configured():
-            configured_providers.append("google_cse")
+        if settings.is_tavily_configured():
+            configured_providers.append("tavily")
         if settings.is_brave_configured():
             configured_providers.append("brave")
 

@@ -8,6 +8,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 import structlog
 
+from web_search_mcp.config import settings
 from web_search_mcp.exceptions import ScraperContentError
 from web_search_mcp.models.common import Image, Link, Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
@@ -57,6 +58,7 @@ class TrafilaturaScraper:
             headers={
                 "User-Agent": "Mozilla/5.0 (compatible; WebSearchMCP/1.0)",
             },
+            verify=settings.get_ssl_context(),
         )
 
     async def scrape(
@@ -158,6 +160,7 @@ class TrafilaturaScraper:
                 try:
                     # Try dataclass asdict first (trafilatura 2.0+)
                     from dataclasses import asdict
+
                     meta_dict = asdict(metadata)
                 except (TypeError, ImportError):
                     # Fall back to __dict__ for older versions
@@ -267,6 +270,7 @@ class TrafilaturaScraper:
 
         async with anyio.create_task_group() as tg:
             for url in urls:
+
                 async def do_scrape(u: str) -> None:
                     result = await scrape_with_semaphore(u)
                     results.append(result)
@@ -297,9 +301,7 @@ class TrafilaturaScraper:
             result = await self.scrape(base_url, ScrapeOptions(include_links=True))
 
             if not result.success:
-                return DiscoverResult.from_error(
-                    base_url, result.error_message or "Scrape failed"
-                )
+                return DiscoverResult.from_error(base_url, result.error_message or "Scrape failed")
 
             # Extract URLs from the same domain
             base_domain = urlparse(base_url).netloc
