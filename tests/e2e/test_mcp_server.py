@@ -93,15 +93,10 @@ class TestMCPToolsIntegration:
 
     @pytest.mark.asyncio
     async def test_web_search_tool_call(
-        self, mock_provider_registry, mock_scraper, mock_cache
+        self, mock_provider_registry, mock_cache
     ):
         """Test web_search tool with mocked dependencies."""
-        from mcp.server.fastmcp import FastMCP
-
         from web_search_mcp.models.search import SearchResponse
-
-        # Create a minimal MCP server for testing
-        mcp = FastMCP("Test", json_response=True)
 
         # Mock the context
         mock_ctx = MagicMock()
@@ -121,9 +116,7 @@ class TestMCPToolsIntegration:
             assert len(response.results) == 1
 
     @pytest.mark.asyncio
-    async def test_scrape_url_tool_call(
-        self, mock_provider_registry, mock_scraper, mock_cache
-    ):
+    async def test_scrape_url_tool_call(self, mock_scraper):
         """Test scrape_url tool with mocked dependencies."""
         from web_search_mcp.models.scrape import ScrapeOptions, ScrapeResult
 
@@ -135,9 +128,7 @@ class TestMCPToolsIntegration:
         assert result.markdown == "# Test Page\n\nTest content"
 
     @pytest.mark.asyncio
-    async def test_batch_scrape_tool_call(
-        self, mock_provider_registry, mock_scraper, mock_cache
-    ):
+    async def test_batch_scrape_tool_call(self, mock_scraper):
         """Test batch_scrape tool with mocked dependencies."""
         from web_search_mcp.models.scrape import ScrapeOptions
 
@@ -154,9 +145,7 @@ class TestMCPToolsIntegration:
         assert all(r.success for r in results)
 
     @pytest.mark.asyncio
-    async def test_discover_urls_tool_call(
-        self, mock_provider_registry, mock_scraper, mock_cache
-    ):
+    async def test_discover_urls_tool_call(self, mock_scraper):
         """Test discover_urls tool with mocked dependencies."""
         from web_search_mcp.models.scrape import DiscoverResult
 

@@ -42,7 +42,7 @@ class TestSearchTool:
         return cache
 
     @pytest.mark.asyncio
-    async def test_search_tool_returns_results(self, mock_registry, mock_cache):
+    async def test_search_tool_returns_results(self, mock_registry):
         """Test that search tool returns formatted results."""
         # Call the mock registry directly (simulating tool behavior)
         response = await mock_registry.search(
@@ -82,7 +82,7 @@ class TestScrapeTool:
         return cache
 
     @pytest.mark.asyncio
-    async def test_scrape_tool_returns_content(self, mock_scraper, mock_cache):
+    async def test_scrape_tool_returns_content(self, mock_scraper):
         """Test that scrape tool returns markdown content."""
         from web_search_mcp.models.scrape import ScrapeOptions
 

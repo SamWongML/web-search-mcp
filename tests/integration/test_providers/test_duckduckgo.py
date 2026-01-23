@@ -46,9 +46,11 @@ class TestDuckDuckGoProvider:
         mock_ddgs = MagicMock()
         mock_ddgs.text.side_effect = Exception("Network error")
 
-        with patch.object(provider, "_create_ddgs", return_value=mock_ddgs):
-            with pytest.raises(ProviderAPIError):
-                await provider.search("python", max_results=10)
+        with (
+            patch.object(provider, "_create_ddgs", return_value=mock_ddgs),
+            pytest.raises(ProviderAPIError),
+        ):
+            await provider.search("python", max_results=10)
 
     @pytest.mark.asyncio
     async def test_always_configured(self, provider):
@@ -74,7 +76,7 @@ class TestDuckDuckGoProvider:
         ]
 
         with patch.object(provider, "_create_ddgs", return_value=mock_ddgs):
-            results = await provider.search(
+            await provider.search(
                 "python",
                 max_results=5,
                 region="us-en",
