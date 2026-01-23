@@ -1,4 +1,4 @@
-"""DuckDuckGo search provider using duckduckgo-search library."""
+"""DuckDuckGo search provider using ddgs library."""
 
 import asyncio
 import time
@@ -17,10 +17,10 @@ class DuckDuckGoProvider:
     """
     DuckDuckGo search provider.
 
-    Uses the duckduckgo-search library which scrapes DuckDuckGo.
+    Uses the ddgs library which scrapes DuckDuckGo.
     No API key required, but has rate limits.
 
-    https://github.com/deedy5/duckduckgo_search
+    https://github.com/deedy5/ddgs
     """
 
     def __init__(self) -> None:
@@ -44,10 +44,10 @@ class DuckDuckGoProvider:
     def _create_ddgs(self) -> Any:
         """Create a DDGS instance. Separated for easier testing."""
         try:
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS
         except ImportError as e:
             raise ProviderAPIError(
-                self.name, 500, f"duckduckgo-search library not installed: {e}"
+                self.name, 500, f"ddgs library not installed: {e}"
             ) from e
         return DDGS()
 

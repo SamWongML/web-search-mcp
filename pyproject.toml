@@ -15,7 +15,7 @@ dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "google-search-results>=2.4.0",
-    "duckduckgo-search>=7.0.0",
+    "ddgs>=8.0.0",
     "crawl4ai>=0.4.0",
     "trafilatura>=2.0.0",
     "html2text>=2024.2.26",
@@ -96,7 +96,7 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = [
     "serpapi.*",
-    "duckduckgo_search.*",
+    "ddgs.*",
     "crawl4ai.*",
     "trafilatura.*",
     "html2text.*",
