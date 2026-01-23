@@ -1,0 +1,105 @@
+[project]
+name = "web-search-mcp"
+version = "0.1.0"
+description = "A lightweight MCP server for web search and scraping - Firecrawl alternative"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Web Search MCP Team" }]
+
+dependencies = [
+    "mcp[cli]>=1.9.0",
+    "uvicorn[standard]>=0.32.0",
+    "starlette>=0.41.0",
+    "httpx[http2]>=0.28.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "google-search-results>=2.4.0",
+    "duckduckgo-search>=7.0.0",
+    "crawl4ai>=0.4.0",
+    "trafilatura>=2.0.0",
+    "html2text>=2024.2.26",
+    "diskcache>=5.6.0",
+    "tenacity>=9.0.0",
+    "structlog>=24.0.0",
+    "anyio>=4.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "pytest-mock>=3.14",
+    "respx>=0.22",
+    "inline-snapshot>=0.18",
+    "testcontainers>=4.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-requests",
+]
+
+[project.scripts]
+web-search-mcp = "web_search_mcp.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/web_search_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "docker: Docker container tests",
+    "slow: Slow tests",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["src/web_search_mcp"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+fail_under = 65
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "ARG", "PTH"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["web_search_mcp"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "serpapi.*",
+    "duckduckgo_search.*",
+    "crawl4ai.*",
+    "trafilatura.*",
+    "html2text.*",
+    "diskcache.*",
+]
+ignore_missing_imports = true

@@ -1,0 +1,82 @@
+# Docker Compose for local development
+# Run with: docker compose up
+
+services:
+  web-search-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: web-search-mcp
+    ports:
+      - "8000:8000"
+    environment:
+      # Server config
+      - WEBSEARCH_DEBUG=true
+      - WEBSEARCH_LOG_LEVEL=DEBUG
+      - WEBSEARCH_HOST=0.0.0.0
+      - WEBSEARCH_PORT=8000
+
+      # Search Provider API Keys (from .env or environment)
+      - WEBSEARCH_SERPAPI_KEY=${SERPAPI_KEY:-}
+      - WEBSEARCH_GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - WEBSEARCH_GOOGLE_CX=${GOOGLE_CX:-}
+      - WEBSEARCH_BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - WEBSEARCH_JINA_API_KEY=${JINA_API_KEY:-}
+
+      # Cache settings
+      - WEBSEARCH_CACHE_ENABLED=true
+      - WEBSEARCH_CACHE_TTL_SECONDS=3600
+
+      # Scraper settings
+      - WEBSEARCH_USE_BROWSER_SCRAPER=true
+      - WEBSEARCH_MAX_CONCURRENT_SCRAPES=5
+
+    volumes:
+      # Mount source for hot reload
+      - ../src:/app/src:ro
+      # Persist cache
+      - cache-data:/app/.cache
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    restart: unless-stopped
+
+    # Resource limits for local development
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+
+  # Optional: Redis for distributed caching
+  redis:
+    image: redis:7-alpine
+    container_name: web-search-mcp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - with-redis
+
+
+volumes:
+  cache-data:
+  redis-data:
+
+
+networks:
+  default:
+    name: web-search-mcp-network

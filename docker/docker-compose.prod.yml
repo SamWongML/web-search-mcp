@@ -1,0 +1,75 @@
+# Production Docker Compose
+# Run with: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  web-search-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: web-search-mcp-prod
+    ports:
+      - "8000:8000"
+    environment:
+      # Server config
+      - WEBSEARCH_DEBUG=false
+      - WEBSEARCH_LOG_LEVEL=INFO
+      - WEBSEARCH_HOST=0.0.0.0
+      - WEBSEARCH_PORT=8000
+
+      # Search Provider API Keys (from .env or secrets)
+      - WEBSEARCH_SERPAPI_KEY=${SERPAPI_KEY}
+      - WEBSEARCH_GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - WEBSEARCH_GOOGLE_CX=${GOOGLE_CX}
+      - WEBSEARCH_BRAVE_API_KEY=${BRAVE_API_KEY}
+      - WEBSEARCH_JINA_API_KEY=${JINA_API_KEY}
+
+      # Cache settings
+      - WEBSEARCH_CACHE_ENABLED=true
+      - WEBSEARCH_CACHE_TTL_SECONDS=3600
+      - WEBSEARCH_CACHE_MAX_SIZE=1000
+
+      # Scraper settings
+      - WEBSEARCH_USE_BROWSER_SCRAPER=true
+      - WEBSEARCH_MAX_CONCURRENT_SCRAPES=5
+      - WEBSEARCH_SCRAPE_TIMEOUT_SECONDS=30
+
+      # HTTP settings
+      - WEBSEARCH_MAX_CONNECTIONS=100
+      - WEBSEARCH_REQUEST_TIMEOUT=30
+
+    volumes:
+      - cache-data:/home/app/.cache
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    restart: always
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+volumes:
+  cache-data:
+    driver: local
+
+
+networks:
+  default:
+    name: web-search-mcp-prod
