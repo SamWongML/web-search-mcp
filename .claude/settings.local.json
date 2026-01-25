@@ -8,7 +8,14 @@
       "Bash(uv run:*)",
       "Bash(tree:*)",
       "Bash(ls:*)",
-      "WebFetch(domain:tavily.com)"
+      "WebFetch(domain:tavily.com)",
+      "WebFetch(domain:docs.crawl4ai.com)",
+      "WebFetch(domain:docs.firecrawl.dev)",
+      "Bash(uv add:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_close"
     ]
   }
 }

@@ -6,6 +6,7 @@ import structlog
 
 from web_search_mcp.models.common import Image, Link, Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
+from web_search_mcp.utils.content_extractor import extract_main_content, extract_metadata
 from web_search_mcp.utils.markdown import clean_markdown
 
 logger = structlog.get_logger(__name__)
@@ -121,17 +122,32 @@ class Crawl4AIScraper:
                     url, result.error_message or "Crawl failed", elapsed_ms
                 )
 
-            # Extract markdown content
-            markdown = ""
-            if hasattr(result, "markdown"):
-                if hasattr(result.markdown, "raw_markdown"):
-                    markdown = result.markdown.raw_markdown
-                elif hasattr(result.markdown, "fit_markdown"):
-                    markdown = result.markdown.fit_markdown
-                else:
-                    markdown = str(result.markdown)
+            # Extract main content using trafilatura/readability pipeline
+            # This produces Firecrawl-quality clean markdown
+            markdown = extract_main_content(
+                result.html,
+                url=url,
+                include_links=options.include_links,
+                include_images=options.include_images,
+                include_tables=True,
+                favor_precision=True,
+            )
 
-            markdown = clean_markdown(markdown)
+            # Fall back to Crawl4AI's markdown if extraction fails
+            if not markdown or len(markdown.strip()) < 50:
+                logger.debug(
+                    "content_extractor_fallback",
+                    reason="extraction_failed",
+                    url=url,
+                )
+                if hasattr(result, "markdown"):
+                    if hasattr(result.markdown, "raw_markdown"):
+                        markdown = result.markdown.raw_markdown
+                    elif hasattr(result.markdown, "fit_markdown"):
+                        markdown = result.markdown.fit_markdown
+                    else:
+                        markdown = str(result.markdown)
+                markdown = clean_markdown(markdown)
 
             # Build metadata
             metadata = Metadata()
@@ -252,15 +268,24 @@ class Crawl4AIScraper:
                     )
                     continue
 
-                # Extract markdown
-                markdown = ""
-                if hasattr(raw_result, "markdown"):
-                    if hasattr(raw_result.markdown, "raw_markdown"):
-                        markdown = raw_result.markdown.raw_markdown
-                    else:
-                        markdown = str(raw_result.markdown)
+                # Extract main content using trafilatura/readability pipeline
+                markdown = extract_main_content(
+                    raw_result.html,
+                    url=raw_result.url,
+                    include_links=True,
+                    include_images=False,
+                    include_tables=True,
+                    favor_precision=True,
+                )
 
-                markdown = clean_markdown(markdown)
+                # Fall back to Crawl4AI's markdown if extraction fails
+                if not markdown or len(markdown.strip()) < 50:
+                    if hasattr(raw_result, "markdown"):
+                        if hasattr(raw_result.markdown, "raw_markdown"):
+                            markdown = raw_result.markdown.raw_markdown
+                        else:
+                            markdown = str(raw_result.markdown)
+                    markdown = clean_markdown(markdown)
 
                 # Build metadata
                 metadata = Metadata()
