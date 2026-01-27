@@ -14,6 +14,7 @@ The extraction pipeline:
 4. Apply post-processing to fix common issues
 """
 
+import contextlib
 import re
 from typing import Literal
 from urllib.parse import urljoin, urlparse
@@ -265,16 +266,12 @@ def _preprocess_html(html: str, url: str | None = None) -> str:
         # Make image URLs absolute (like Firecrawl)
         if url:
             for img in soup.find_all("img", src=True):
-                try:
+                with contextlib.suppress(Exception):
                     img["src"] = urljoin(url, img["src"])
-                except Exception:
-                    pass
 
             for a in soup.find_all("a", href=True):
-                try:
+                with contextlib.suppress(Exception):
                     a["href"] = urljoin(url, a["href"])
-                except Exception:
-                    pass
 
         return str(soup)
 
@@ -363,7 +360,7 @@ def _extract_with_trafilatura(
 
 def _extract_with_readability(
     html: str,
-    url: str | None = None,
+    url: str | None = None,  # noqa: ARG001
     include_links: bool = True,
 ) -> str:
     """Extract content using readability + markdownify."""
@@ -420,6 +417,13 @@ def _postprocess_markdown(markdown: str, base_url: str | None = None) -> str:
 
     text = markdown
 
+    # Fix malformed bold markers with internal spaces (single line only)
+    # e.g., "** text:**" -> "**text:**" and "** text **:" -> "**text**:"
+    # Use [^\n*] to avoid matching across lines/bold sections
+    text = re.sub(r"\*\* ([^\n*]+?) \*\*", r"**\1**", text)  # Both spaces
+    text = re.sub(r"\*\* ([^\n*]+?)\*\*", r"**\1**", text)  # Leading space only
+    text = re.sub(r"\*\*([^\n*]+?) \*\*", r"**\1**", text)  # Trailing space only
+
     # Fix links with angle brackets: [text](<url>) -> [text](url)
     text = re.sub(r"\]\(<([^>]+)>\)", r"](\1)", text)
 
@@ -435,12 +439,13 @@ def _postprocess_markdown(markdown: str, base_url: str | None = None) -> str:
 
     # Fix bold text running into next content (trafilatura issue)
     # e.g., "**Local threads**run" -> "**Local threads** run"
-    text = re.sub(r"\*\*([^*]+?)\*\*([a-zA-Z])", r"**\1** \2", text)
+    # Limit to 50 chars to avoid matching across multiple bold sections
+    text = re.sub(r"\*\*([^\n*]{1,50}?)\*\*([a-zA-Z])", r"**\1** \2", text)
 
     # Fix content running into bold text (opening bold)
     # e.g., "model's**context**" -> "model's **context**"
-    # Crucial: bold content must NOT start with a space to avoid matching across bold items
-    text = re.sub(r"([a-zA-Z0-9])\*\*([^\s*][^*]*?)\*\*", r"\1 **\2**", text)
+    # Limit to 50 chars to avoid matching across multiple bold sections
+    text = re.sub(r"([a-zA-Z0-9])\*\*([^\n\s*][^\n*]{0,50}?)\*\*", r"\1 **\2**", text)
 
     # Fix sentences running together after links/bold
     # e.g., "...in a [sandbox](url).**Cloud" -> "...in a [sandbox](url).\n\n**Cloud"
@@ -571,7 +576,7 @@ def _fix_code_blocks(text: str) -> str:
                     result.append("```")
                 else:
                     # Single line, keep as indented
-                    result.extend(["    " + l for l in indented_lines])
+                    result.extend(["    " + line for line in indented_lines])
                 result.append(line)
                 in_indented_block = False
                 indented_lines = []
@@ -585,7 +590,7 @@ def _fix_code_blocks(text: str) -> str:
             result.extend(indented_lines)
             result.append("```")
         else:
-            result.extend(["    " + l for l in indented_lines])
+            result.extend(["    " + line for line in indented_lines])
 
     return "\n".join(result)
 
