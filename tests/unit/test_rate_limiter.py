@@ -199,3 +199,54 @@ class TestMultiProviderRateLimiter:
         # Unknown provider should return None
         unknown_limiter = limiter.get_limiter("unknown")
         assert unknown_limiter is None
+
+    @pytest.mark.asyncio
+    async def test_acquire_unknown_provider(self, test_settings):
+        """Test acquire for unknown provider returns True."""
+        from web_search_mcp.utils.rate_limiter import MultiProviderRateLimiter
+
+        limiter = MultiProviderRateLimiter(test_settings)
+        assert await limiter.acquire("unknown", timeout=0.01) is True
+
+    @pytest.mark.asyncio
+    async def test_acquire_known_provider(self, test_settings):
+        """Test acquire for a known provider uses limiter."""
+        from web_search_mcp.utils.rate_limiter import MultiProviderRateLimiter
+
+        limiter = MultiProviderRateLimiter(test_settings)
+        assert await limiter.acquire("serpapi", timeout=0.01) is True
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_decorator_raises():
+    """Test rate_limited decorator raises on timeout."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from web_search_mcp.utils.rate_limiter import RateLimitExceededError, rate_limited
+
+    limiter = MagicMock()
+    limiter.acquire = AsyncMock(return_value=False)
+
+    @rate_limited(limiter, timeout=0.01)
+    async def fn():
+        return "ok"
+
+    with pytest.raises(RateLimitExceededError):
+        await fn()
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_decorator_allows():
+    """Test rate_limited decorator allows when acquired."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from web_search_mcp.utils.rate_limiter import rate_limited
+
+    limiter = MagicMock()
+    limiter.acquire = AsyncMock(return_value=True)
+
+    @rate_limited(limiter, timeout=0.01)
+    async def fn():
+        return "ok"
+
+    assert await fn() == "ok"

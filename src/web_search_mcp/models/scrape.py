@@ -1,5 +1,7 @@
 """Scraping-related Pydantic models."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from web_search_mcp.models.common import Image, Link, Metadata
@@ -16,8 +18,48 @@ class ScrapeOptions(BaseModel):
     )
     timeout_seconds: int = Field(default=30, ge=1, le=120, description="Scrape timeout")
     use_browser: bool = Field(default=True, description="Use browser-based scraping")
+    formats: list[Literal["markdown", "text", "html", "raw_html"]] | None = Field(
+        default=None,
+        description="Output formats to include (default uses server setting)",
+    )
+    only_main_content: bool | None = Field(
+        default=None,
+        description="Return only main content (default uses server setting)",
+    )
+    include_tags: list[str] = Field(
+        default_factory=list,
+        description="CSS selectors to force-include",
+    )
+    exclude_tags: list[str] = Field(
+        default_factory=list,
+        description="CSS selectors to exclude",
+    )
+    max_length: int | None = Field(
+        default=None,
+        ge=1,
+        description="Max characters for markdown/text outputs",
+    )
+    max_age_seconds: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum cache age (seconds) for cached responses",
+    )
 
     model_config = {"extra": "ignore"}
+
+    def apply_defaults(self) -> "ScrapeOptions":
+        """Apply server defaults for formats and only_main_content."""
+        from web_search_mcp.config import settings
+
+        update: dict[str, object] = {}
+        if self.formats is None:
+            update["formats"] = settings.get_default_scrape_formats()
+        if self.only_main_content is None:
+            update["only_main_content"] = settings.default_only_main_content
+
+        if not update:
+            return self
+        return self.model_copy(update=update)
 
 
 class ScrapeResult(BaseModel):
@@ -25,7 +67,9 @@ class ScrapeResult(BaseModel):
 
     url: str = Field(..., description="The scraped URL")
     markdown: str = Field(default="", description="Page content as markdown")
-    html: str | None = Field(default=None, description="Raw HTML content")
+    text: str | None = Field(default=None, description="Page content as plain text")
+    html: str | None = Field(default=None, description="Cleaned main-content HTML")
+    raw_html: str | None = Field(default=None, description="Unmodified raw HTML content")
     metadata: Metadata = Field(default_factory=Metadata, description="Page metadata")
     links: list[Link] = Field(default_factory=list, description="Extracted links")
     images: list[Image] = Field(default_factory=list, description="Extracted images")

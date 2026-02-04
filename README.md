@@ -7,6 +7,7 @@ A lightweight, high-performance Model Context Protocol (MCP) server for web sear
 - **Multiple Search Providers**: SerpAPI, Tavily Search, Brave Search, DuckDuckGo
 - **Automatic Fallback**: Seamlessly falls back to next provider on failure
 - **Web Scraping**: Extract clean markdown from any webpage
+- **Search + Scrape**: Optionally attach scraped content to search results
 - **Batch Operations**: Scrape multiple URLs concurrently
 - **URL Discovery**: Find all links on a webpage
 - **Rate Limiting**: Built-in rate limiting per provider
@@ -54,6 +55,9 @@ cp .env.example .env
 | `SCRAPER_TYPE` | `trafilatura` | Scraper: `trafilatura`, `crawl4ai`, `jina` |
 | `CACHE_TTL_SECONDS` | `300` | Cache time-to-live |
 | `CACHE_MAX_SIZE` | `1000` | Maximum cache entries |
+| `SEARCH_SCRAPE_MAX_CONCURRENT` | `5` | Max concurrent scrapes in web_search |
+| `DEFAULT_SCRAPE_FORMATS` | `markdown` | Default scrape output formats |
+| `DEFAULT_ONLY_MAIN_CONTENT` | `true` | Default main-content filtering |
 
 ## Usage
 
@@ -76,13 +80,22 @@ The server exposes four MCP tools:
 
 #### 1. web_search
 
-Search the web using configured providers with automatic fallback.
+Search the web using configured providers with automatic fallback. Optionally attach scraped content.
 
 ```json
 {
   "query": "python async programming",
   "max_results": 10,
-  "provider": null
+  "language": "en",
+  "region": "us",
+  "safe_search": true,
+  "include_domains": ["docs.python.org"],
+  "scrape_options": {
+    "formats": ["markdown", "text"],
+    "only_main_content": true,
+    "max_length": 20000
+  },
+  "max_scrape_results": 5
 }
 ```
 
@@ -95,7 +108,11 @@ Scrape a single URL and extract clean markdown content.
   "url": "https://example.com/article",
   "include_links": true,
   "include_images": false,
-  "max_length": null
+  "formats": ["markdown", "text"],
+  "only_main_content": true,
+  "include_tags": ["main"],
+  "exclude_tags": [".ads"],
+  "max_length": 20000
 }
 ```
 
@@ -110,7 +127,8 @@ Scrape multiple URLs concurrently.
     "https://example.com/page2"
   ],
   "max_concurrent": 5,
-  "include_links": false
+  "include_links": false,
+  "formats": ["markdown"]
 }
 ```
 
@@ -121,8 +139,22 @@ Discover all links on a webpage.
 ```json
 {
   "url": "https://example.com",
-  "max_urls": 100,
-  "same_domain_only": true
+  "max_urls": 100
+}
+```
+
+#### 5. map_urls
+
+Map URLs on a site with optional filters.
+
+```json
+{
+  "url": "https://example.com",
+  "max_urls": 200,
+  "search": "docs",
+  "same_domain_only": true,
+  "include_subdomains": false,
+  "exclude_patterns": ["\\?utm_"]
 }
 ```
 

@@ -122,6 +122,33 @@ class TestLRUCache:
         result = cache.get_sync("key1")
         assert result == "value1"
 
+    def test_sync_get_missing_and_expired(self):
+        """Test sync get handles missing and expired entries."""
+        cache: LRUCache[str] = LRUCache(max_size=10, ttl_seconds=0.1)
+
+        assert cache.get_sync("missing") is None
+
+        cache.set_sync("key1", "value1")
+        assert cache.get_sync("key1") == "value1"
+
+        import time
+
+        time.sleep(0.15)
+        assert cache.get_sync("key1") is None
+
+    def test_sync_set_overwrite_and_eviction(self):
+        """Test sync set overwrites and evicts."""
+        cache: LRUCache[str] = LRUCache(max_size=2)
+
+        cache.set_sync("key1", "value1")
+        cache.set_sync("key1", "value2")
+        assert cache.get_sync("key1") == "value2"
+
+        cache.set_sync("key2", "value2")
+        cache.set_sync("key3", "value3")
+        assert cache.get_sync("key1") is None
+        assert cache.get_sync("key2") == "value2"
+
     def test_size_property(self):
         """Test size property."""
         cache: LRUCache[str] = LRUCache(max_size=10)
@@ -185,6 +212,39 @@ class TestResponseCache:
         assert cached == response
 
     @pytest.mark.asyncio
+    async def test_cache_max_age(self):
+        """Test max_age_seconds enforcement."""
+        cache = ResponseCache(ttl_seconds=3600, max_size=100, enabled=True)
+
+        response = {"markdown": "# Test", "url": "https://example.com"}
+        await cache.set_scrape("https://example.com", response)
+
+        assert await cache.get_scrape("https://example.com", max_age_seconds=1) == response
+
+        await asyncio.sleep(1.1)
+        assert await cache.get_scrape("https://example.com", max_age_seconds=1) is None
+
+    @pytest.mark.asyncio
+    async def test_search_cache_max_age_expired(self):
+        """Test search cache respects max_age_seconds."""
+        cache = ResponseCache(ttl_seconds=3600, max_size=100, enabled=True)
+
+        response = {"results": [{"title": "Test"}], "provider": "test"}
+        await cache.set_search("python", 10, response)
+
+        assert await cache.get_search("python", 10, max_age_seconds=1) == response
+        await asyncio.sleep(1.1)
+        assert await cache.get_search("python", 10, max_age_seconds=1) is None
+
+    def test_unwrap_response_passthrough(self):
+        """Test unwrap_response returns entry without cache wrapper."""
+        assert ResponseCache._unwrap_response({"foo": "bar"}) == {"foo": "bar"}
+
+    def test_is_fresh_with_missing_cached_at(self):
+        """Test _is_fresh handles missing cached_at."""
+        assert ResponseCache._is_fresh({"_cached_at": None}, max_age_seconds=10) is True
+
+    @pytest.mark.asyncio
     async def test_cache_disabled(self):
         """Test that disabled cache always returns None."""
         cache = ResponseCache(enabled=False)
@@ -219,3 +279,12 @@ class TestResponseCache:
         # Should match with different case
         cached = await cache.get_search("python", 10)
         assert cached == response
+
+    def test_generate_key_with_unsortable_list(self):
+        """Test cache key generation with unsortable list values."""
+        key = ResponseCache._generate_key(
+            "search",
+            query="q",
+            filters=[{"a": 1}, {"b": 2}],
+        )
+        assert isinstance(key, str)

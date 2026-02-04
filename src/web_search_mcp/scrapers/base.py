@@ -65,6 +65,8 @@ class Scraper(Protocol):
         self,
         base_url: str,
         max_urls: int = 100,
+        same_domain_only: bool = True,
+        include_subdomains: bool = False,
     ) -> DiscoverResult:
         """
         Discover URLs on a website.

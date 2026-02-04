@@ -57,6 +57,67 @@ def truncate_markdown(text: str, max_chars: int = 50000) -> str:
     return truncated
 
 
+def truncate_text(text: str, max_chars: int = 50000) -> str:
+    """
+    Truncate plain text to a maximum character count.
+
+    Args:
+        text: Text to truncate
+        max_chars: Maximum characters
+
+    Returns:
+        Truncated text
+    """
+    if len(text) <= max_chars:
+        return text
+
+    truncated = text[:max_chars]
+    last_break = truncated.rfind("\n")
+    if last_break > max_chars * 0.8:
+        truncated = truncated[:last_break]
+
+    truncated = truncated.rstrip()
+    truncated += "\n\n[Content truncated...]"
+    return truncated
+
+
+def markdown_to_text(markdown: str) -> str:
+    """
+    Convert basic markdown to plain text.
+
+    Args:
+        markdown: Markdown text
+
+    Returns:
+        Plain text
+    """
+    if not markdown:
+        return ""
+
+    text = markdown
+
+    # Remove fenced code blocks
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+
+    # Inline code
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+
+    # Images and links
+    text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+
+    # Headings
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+
+    # Lists
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
+
+    # Bold/italic
+    text = re.sub(r"[*_]{1,3}([^*_]+)[*_]{1,3}", r"\1", text)
+
+    return clean_markdown(text)
+
 def extract_title_from_markdown(markdown: str) -> str | None:
     """
     Extract the title (first H1) from markdown.

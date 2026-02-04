@@ -3,11 +3,10 @@
 import time
 
 import structlog
-
 from web_search_mcp.models.common import Image, Link, Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
-from web_search_mcp.utils.content_extractor import extract_main_content, extract_metadata
-from web_search_mcp.utils.markdown import clean_markdown
+from web_search_mcp.utils.content_extractor import extract_main_content
+from web_search_mcp.utils.markdown import clean_markdown, markdown_to_text, truncate_markdown, truncate_text
 
 logger = structlog.get_logger(__name__)
 
@@ -74,6 +73,87 @@ class Crawl4AIScraper:
             logger.error("crawl4ai_init_error", error=str(e))
             raise
 
+    @staticmethod
+    def _normalize_formats(formats: list[str] | None) -> set[str]:
+        if not formats:
+            return {"markdown"}
+        return {f.strip().lower() for f in formats if f and f.strip()}
+
+    def _build_content(
+        self,
+        html: str,
+        url: str,
+        options: ScrapeOptions,
+        fallback_markdown: str | None = None,
+    ) -> tuple[str, str | None, str | None]:
+        formats = self._normalize_formats(options.formats)
+        want_markdown = "markdown" in formats
+        want_text = "text" in formats
+        want_html = "html" in formats
+
+        markdown = ""
+        text: str | None = None
+        html_out: str | None = None
+
+        if want_markdown:
+            markdown = extract_main_content(
+                html,
+                url=url,
+                include_links=options.include_links,
+                include_images=options.include_images,
+                include_tables=True,
+                favor_precision=True,
+                only_main_content=bool(options.only_main_content),
+                include_selectors=options.include_tags,
+                exclude_selectors=options.exclude_tags,
+                output_format="markdown",
+            )
+
+            if (not markdown or len(markdown.strip()) < 50) and fallback_markdown:
+                markdown = clean_markdown(fallback_markdown)
+
+        if want_text:
+            if markdown:
+                text = markdown_to_text(markdown)
+            else:
+                text = extract_main_content(
+                    html,
+                    url=url,
+                    include_links=options.include_links,
+                    include_images=options.include_images,
+                    include_tables=True,
+                    favor_precision=True,
+                    only_main_content=bool(options.only_main_content),
+                    include_selectors=options.include_tags,
+                    exclude_selectors=options.exclude_tags,
+                    output_format="text",
+                )
+
+            if (not text or len(text.strip()) < 50) and fallback_markdown:
+                text = markdown_to_text(clean_markdown(fallback_markdown))
+
+        if want_html:
+            html_out = extract_main_content(
+                html,
+                url=url,
+                include_links=options.include_links,
+                include_images=options.include_images,
+                include_tables=True,
+                favor_precision=True,
+                only_main_content=bool(options.only_main_content),
+                include_selectors=options.include_tags,
+                exclude_selectors=options.exclude_tags,
+                output_format="html",
+            )
+
+        if options.max_length:
+            if markdown:
+                markdown = truncate_markdown(markdown, options.max_length)
+            if text:
+                text = truncate_text(text, options.max_length)
+
+        return markdown, text, html_out
+
     async def scrape(
         self,
         url: str,
@@ -89,7 +169,7 @@ class Crawl4AIScraper:
         Returns:
             ScrapeResult with markdown content
         """
-        options = options or ScrapeOptions()
+        options = (options or ScrapeOptions()).apply_defaults()
         start_time = time.monotonic()
 
         try:
@@ -122,36 +202,26 @@ class Crawl4AIScraper:
                     url, result.error_message or "Crawl failed", elapsed_ms
                 )
 
-            # Extract main content using trafilatura/readability pipeline
-            # This produces Firecrawl-quality clean markdown
-            markdown = extract_main_content(
-                result.html,
-                url=url,
-                include_links=options.include_links,
-                include_images=options.include_images,
-                include_tables=True,
-                favor_precision=True,
-            )
+            fallback_markdown = None
+            if hasattr(result, "markdown"):
+                if hasattr(result.markdown, "raw_markdown"):
+                    fallback_markdown = result.markdown.raw_markdown
+                elif hasattr(result.markdown, "fit_markdown"):
+                    fallback_markdown = result.markdown.fit_markdown
+                else:
+                    fallback_markdown = str(result.markdown)
 
-            # Fall back to Crawl4AI's markdown if extraction fails
-            if not markdown or len(markdown.strip()) < 50:
-                logger.debug(
-                    "content_extractor_fallback",
-                    reason="extraction_failed",
-                    url=url,
-                )
-                if hasattr(result, "markdown"):
-                    if hasattr(result.markdown, "raw_markdown"):
-                        markdown = result.markdown.raw_markdown
-                    elif hasattr(result.markdown, "fit_markdown"):
-                        markdown = result.markdown.fit_markdown
-                    else:
-                        markdown = str(result.markdown)
-                markdown = clean_markdown(markdown)
+            formats = self._normalize_formats(options.formats)
+            markdown, text, html_out = self._build_content(
+                result.html,
+                url,
+                options,
+                fallback_markdown=fallback_markdown,
+            )
 
             # Build metadata
             metadata = Metadata()
-            if hasattr(result, "metadata") and result.metadata:
+            if options.include_metadata and hasattr(result, "metadata") and result.metadata:
                 metadata = Metadata(
                     title=result.metadata.get("title"),
                     description=result.metadata.get("description"),
@@ -195,9 +265,14 @@ class Crawl4AIScraper:
                             )
                         )
 
+            raw_html = result.html if "raw_html" in formats else None
+
             return ScrapeResult(
                 url=url,
                 markdown=markdown,
+                text=text,
+                html=html_out,
+                raw_html=raw_html,
                 metadata=metadata,
                 links=links[:100],
                 images=images[:50],
@@ -227,7 +302,7 @@ class Crawl4AIScraper:
         Returns:
             List of ScrapeResult objects
         """
-        options = options or ScrapeOptions()
+        options = (options or ScrapeOptions()).apply_defaults()
         start_time = time.monotonic()
 
         try:
@@ -253,6 +328,8 @@ class Crawl4AIScraper:
                 dispatcher=dispatcher,
             )
 
+            formats = self._normalize_formats(options.formats)
+
             # Convert to ScrapeResult objects
             results: list[ScrapeResult] = []
             for raw_result in raw_results:
@@ -268,37 +345,37 @@ class Crawl4AIScraper:
                     )
                     continue
 
-                # Extract main content using trafilatura/readability pipeline
-                markdown = extract_main_content(
-                    raw_result.html,
-                    url=raw_result.url,
-                    include_links=True,
-                    include_images=False,
-                    include_tables=True,
-                    favor_precision=True,
-                )
+                fallback_markdown = None
+                if hasattr(raw_result, "markdown"):
+                    if hasattr(raw_result.markdown, "raw_markdown"):
+                        fallback_markdown = raw_result.markdown.raw_markdown
+                    else:
+                        fallback_markdown = str(raw_result.markdown)
 
-                # Fall back to Crawl4AI's markdown if extraction fails
-                if not markdown or len(markdown.strip()) < 50:
-                    if hasattr(raw_result, "markdown"):
-                        if hasattr(raw_result.markdown, "raw_markdown"):
-                            markdown = raw_result.markdown.raw_markdown
-                        else:
-                            markdown = str(raw_result.markdown)
-                    markdown = clean_markdown(markdown)
+                markdown, text, html_out = self._build_content(
+                    raw_result.html,
+                    raw_result.url,
+                    options,
+                    fallback_markdown=fallback_markdown,
+                )
 
                 # Build metadata
                 metadata = Metadata()
-                if hasattr(raw_result, "metadata") and raw_result.metadata:
+                if options.include_metadata and hasattr(raw_result, "metadata") and raw_result.metadata:
                     metadata = Metadata(
                         title=raw_result.metadata.get("title"),
                         description=raw_result.metadata.get("description"),
                     )
 
+                raw_html = raw_result.html if "raw_html" in formats else None
+
                 results.append(
                     ScrapeResult(
                         url=raw_result.url,
                         markdown=markdown,
+                        text=text,
+                        html=html_out,
+                        raw_html=raw_html,
                         metadata=metadata,
                         scrape_time_ms=elapsed_ms,
                         success=True,
@@ -317,6 +394,8 @@ class Crawl4AIScraper:
         self,
         base_url: str,
         max_urls: int = 100,
+        same_domain_only: bool = True,
+        include_subdomains: bool = False,
     ) -> DiscoverResult:
         """
         Discover URLs on a website using Crawl4AI.
@@ -350,7 +429,17 @@ class Crawl4AIScraper:
             for link in result.links:
                 try:
                     link_domain = urlparse(link.url).netloc
-                    if link_domain == base_domain and link.url not in discovered:
+                    if same_domain_only:
+                        if include_subdomains:
+                            is_match = link_domain == base_domain or link_domain.endswith(
+                                f".{base_domain}"
+                            )
+                        else:
+                            is_match = link_domain == base_domain
+                    else:
+                        is_match = True
+
+                    if is_match and link.url not in discovered:
                         discovered.append(link.url)
                         if len(discovered) >= max_urls:
                             break

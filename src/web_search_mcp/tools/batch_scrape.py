@@ -14,6 +14,13 @@ def register(mcp: FastMCP) -> None:
         max_concurrent: int = 5,
         include_links: bool = True,
         include_images: bool = False,
+        formats: list[str] | None = None,
+        only_main_content: bool | None = None,
+        include_tags: list[str] | None = None,
+        exclude_tags: list[str] | None = None,
+        wait_for_selector: str | None = None,
+        max_length: int | None = None,
+        use_browser: bool = True,
         ctx: Context = None,  # type: ignore[assignment]
     ) -> dict:
         """
@@ -27,6 +34,13 @@ def register(mcp: FastMCP) -> None:
             max_concurrent: Maximum concurrent scrapes (1-10, default: 5)
             include_links: Extract links from pages (default: true)
             include_images: Extract images from pages (default: false)
+            formats: Output formats to include (e.g., ["markdown","text","html","raw_html"])
+            only_main_content: Remove non-main content elements (default: true)
+            include_tags: CSS selectors to force-include
+            exclude_tags: CSS selectors to exclude
+            wait_for_selector: CSS selector to wait for before scraping
+            max_length: Max characters for markdown/text outputs
+            use_browser: Use browser-based scraping for JavaScript-heavy sites
 
         Returns:
             Batch result with individual scrape results, success/failure counts
@@ -61,7 +75,15 @@ def register(mcp: FastMCP) -> None:
         options = ScrapeOptions(
             include_links=include_links,
             include_images=include_images,
+            use_browser=use_browser,
+            formats=formats,
+            only_main_content=only_main_content,
+            include_tags=include_tags or [],
+            exclude_tags=exclude_tags or [],
+            wait_for_selector=wait_for_selector,
+            max_length=max_length,
         )
+        options = options.apply_defaults()
 
         # Perform batch scrape
         results = await app_ctx.scraper.scrape_batch(

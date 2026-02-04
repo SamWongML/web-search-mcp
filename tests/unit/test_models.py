@@ -79,11 +79,19 @@ class TestSearchQuery:
             language="en",
             region="us",
             safe_search=False,
+            time_range="week",
+            include_domains=["example.com"],
+            exclude_domains=["ads.example.com"],
+            search_depth="advanced",
         )
         assert query.max_results == 20
         assert query.language == "en"
         assert query.region == "us"
         assert query.safe_search is False
+        assert query.time_range == "week"
+        assert query.include_domains == ["example.com"]
+        assert query.exclude_domains == ["ads.example.com"]
+        assert query.search_depth == "advanced"
 
     def test_empty_query_raises_error(self):
         """Test that empty query raises validation error."""
@@ -136,6 +144,24 @@ class TestSearchResult:
         )
         assert result.metadata.title == "Custom Title"
         assert result.metadata.language == "en"
+
+    def test_search_result_with_scrape(self):
+        """Test search result with scrape content."""
+        scrape = ScrapeResult(
+            url="https://example.com",
+            markdown="# Example",
+            metadata=Metadata(title="Example"),
+            scrape_time_ms=10.0,
+            success=True,
+        )
+        result = SearchResult(
+            url="https://example.com",
+            title="Example",
+            snippet="Test",
+            position=1,
+            scrape=scrape,
+        )
+        assert result.scrape is not None
 
     def test_invalid_position(self):
         """Test that position must be >= 1."""
@@ -193,6 +219,8 @@ class TestScrapeOptions:
         assert options.include_metadata is True
         assert options.use_browser is True
         assert options.timeout_seconds == 30
+        assert options.formats is None
+        assert options.only_main_content is None
 
     def test_custom_options(self):
         """Test custom scrape options."""
@@ -201,11 +229,38 @@ class TestScrapeOptions:
             include_images=True,
             timeout_seconds=60,
             use_browser=False,
+            formats=["markdown", "text"],
+            only_main_content=False,
+            include_tags=["main"],
+            exclude_tags=[".ads"],
+            max_length=1000,
         )
         assert options.include_links is False
         assert options.include_images is True
         assert options.timeout_seconds == 60
         assert options.use_browser is False
+        assert options.formats == ["markdown", "text"]
+        assert options.only_main_content is False
+        assert options.include_tags == ["main"]
+        assert options.exclude_tags == [".ads"]
+        assert options.max_length == 1000
+
+    def test_apply_defaults(self):
+        """Test applying default settings to scrape options."""
+        from web_search_mcp.config import settings
+
+        options = ScrapeOptions()
+        applied = options.apply_defaults()
+
+        assert applied.formats == settings.get_default_scrape_formats()
+        assert applied.only_main_content == settings.default_only_main_content
+
+    def test_apply_defaults_noop(self):
+        """Test apply_defaults returns same instance when no changes needed."""
+        options = ScrapeOptions(formats=["markdown"], only_main_content=False)
+        applied = options.apply_defaults()
+
+        assert applied is options
 
 
 class TestScrapeResult:

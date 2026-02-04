@@ -99,6 +99,7 @@ async def root(_request: Request) -> JSONResponse:
                 "scrape_url",
                 "batch_scrape",
                 "discover_urls",
+                "map_urls",
             ],
         }
     )

@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     max_concurrent_scrapes: int = 5
     scrape_timeout_seconds: int = 30
     use_browser_scraper: bool = True  # crawl4ai vs trafilatura
+    search_scrape_max_concurrent: int = 5
+    default_scrape_formats: str = "markdown"
+    default_only_main_content: bool = True
 
     # ─── Cache Settings ──────────────────────────────────────────────
     cache_enabled: bool = True
@@ -102,6 +105,13 @@ class Settings(BaseSettings):
         if self.ssl_cert_dir:
             return self.ssl_cert_dir
         return True
+
+    def get_default_scrape_formats(self) -> list[str]:
+        """Return default scrape formats as a list."""
+        if isinstance(self.default_scrape_formats, str):
+            parts = [p.strip() for p in self.default_scrape_formats.split(",")]
+            return [p for p in parts if p]
+        return list(self.default_scrape_formats)
 
 
 # Global settings instance

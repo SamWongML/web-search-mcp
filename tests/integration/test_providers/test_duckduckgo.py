@@ -87,3 +87,38 @@ class TestDuckDuckGoProvider:
             mock_ddgs.text.assert_called_once()
             call_kwargs = mock_ddgs.text.call_args
             assert call_kwargs[1]["safesearch"] == "off"
+            assert call_kwargs[1]["timelimit"] is None
+
+    @pytest.mark.asyncio
+    async def test_search_with_domain_filters(self, provider):
+        """Test search query rewrite with domain filters."""
+        mock_ddgs = MagicMock()
+        mock_ddgs.text.return_value = [
+            {"title": "Test", "href": "https://test.com", "body": "Test"}
+        ]
+
+        with patch.object(provider, "_create_ddgs", return_value=mock_ddgs):
+            await provider.search(
+                "python",
+                max_results=5,
+                include_domains=["example.com"],
+                exclude_domains=["ads.example.com"],
+            )
+
+            call_kwargs = mock_ddgs.text.call_args
+            assert "site:example.com" in call_kwargs[1]["keywords"]
+            assert "-site:ads.example.com" in call_kwargs[1]["keywords"]
+
+    @pytest.mark.asyncio
+    async def test_search_with_time_range(self, provider):
+        """Test search with time range mapping."""
+        mock_ddgs = MagicMock()
+        mock_ddgs.text.return_value = [
+            {"title": "Test", "href": "https://test.com", "body": "Test"}
+        ]
+
+        with patch.object(provider, "_create_ddgs", return_value=mock_ddgs):
+            await provider.search("python", max_results=5, time_range="week")
+
+            call_kwargs = mock_ddgs.text.call_args
+            assert call_kwargs[1]["timelimit"] == "w"

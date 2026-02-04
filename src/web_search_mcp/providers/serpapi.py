@@ -92,8 +92,12 @@ class SerpAPIProvider:
         should_close = self._owns_client and self._http_client is None
 
         try:
+            include_domains = kwargs.get("include_domains") or []
+            exclude_domains = kwargs.get("exclude_domains") or []
+            query_string = self._apply_domain_filters(query, include_domains, exclude_domains)
+
             params = {
-                "q": query,
+                "q": query_string,
                 "api_key": self._api_key,
                 "engine": kwargs.get("engine", "google"),
                 "num": min(max_results, 100),
@@ -105,8 +109,16 @@ class SerpAPIProvider:
                 params["hl"] = kwargs["language"]
             if "region" in kwargs:
                 params["gl"] = kwargs["region"]
+            if "country" in kwargs and "region" not in kwargs:
+                params["gl"] = kwargs["country"]
+            if "location" in kwargs:
+                params["location"] = kwargs["location"]
             if kwargs.get("safe_search", True):
                 params["safe"] = "active"
+            if "time_range" in kwargs and kwargs["time_range"]:
+                tbs = self._normalize_time_range(kwargs["time_range"])
+                if tbs:
+                    params["tbs"] = tbs
 
             start_time = time.monotonic()
             response = await client.get(SERPAPI_BASE_URL, params=params)
@@ -133,6 +145,33 @@ class SerpAPIProvider:
         finally:
             if should_close and isinstance(client, httpx.AsyncClient):
                 await client.aclose()
+
+    @staticmethod
+    def _apply_domain_filters(query: str, include_domains: list[str], exclude_domains: list[str]) -> str:
+        terms = [query]
+        if include_domains:
+            include_expr = " OR ".join(f"site:{domain}" for domain in include_domains)
+            terms.append(f"({include_expr})")
+        if exclude_domains:
+            terms.extend(f"-site:{domain}" for domain in exclude_domains)
+        return " ".join(t for t in terms if t)
+
+    @staticmethod
+    def _normalize_time_range(value: str) -> str | None:
+        v = value.strip().lower()
+        if v.startswith("qdr:"):
+            return v
+        mapping = {
+            "d": "qdr:d",
+            "day": "qdr:d",
+            "w": "qdr:w",
+            "week": "qdr:w",
+            "m": "qdr:m",
+            "month": "qdr:m",
+            "y": "qdr:y",
+            "year": "qdr:y",
+        }
+        return mapping.get(v)
 
     def _parse_results(self, data: dict, max_results: int) -> list[SearchResult]:
         """Parse SerpAPI response into SearchResult objects."""

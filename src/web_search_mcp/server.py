@@ -189,7 +189,7 @@ async def app_lifespan(_server: FastMCP) -> AsyncIterator[AppContext]:
 mcp = FastMCP(
     "Web Search MCP",
     lifespan=app_lifespan,
-    stateless_http=True,
+    stateless_http=False,
     json_response=True,
 )
 

@@ -13,10 +13,11 @@ def register_all_tools(mcp: FastMCP) -> None:
         mcp: FastMCP server instance
     """
     # Import tool modules to trigger registration
-    from web_search_mcp.tools import batch_scrape, discover, scrape, search
+    from web_search_mcp.tools import batch_scrape, discover, map, scrape, search
 
     # Register each tool module
     search.register(mcp)
     scrape.register(mcp)
     batch_scrape.register(mcp)
     discover.register(mcp)
+    map.register(mcp)

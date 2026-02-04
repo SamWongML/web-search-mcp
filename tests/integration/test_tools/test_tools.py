@@ -1,5 +1,6 @@
 """Integration tests for MCP tools."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -53,6 +54,39 @@ class TestSearchTool:
         assert response.query == "test query"
         assert len(response.results) == 1
         assert response.results[0].title == "Example"
+
+    @pytest.mark.asyncio
+    async def test_attach_scrapes_adds_scrape(self):
+        """Test that search attach scrapes adds scrape results."""
+        from web_search_mcp.models.common import Metadata
+        from web_search_mcp.models.scrape import ScrapeResult
+        from web_search_mcp.tools.search import _attach_scrapes
+
+        mock_cache = MagicMock()
+        mock_cache.get_scrape = AsyncMock(return_value=None)
+        mock_cache.set_scrape = AsyncMock()
+
+        mock_scraper = MagicMock()
+        mock_scraper.scrape = AsyncMock(
+            return_value=ScrapeResult(
+                url="https://example.com",
+                markdown="# Example",
+                metadata=Metadata(title="Example"),
+                scrape_time_ms=10.0,
+                success=True,
+            )
+        )
+
+        app_ctx = SimpleNamespace(cache=mock_cache, scraper=mock_scraper)
+
+        result_dict = {
+            "results": [
+                {"url": "https://example.com", "title": "Example", "snippet": "", "position": 1}
+            ]
+        }
+
+        updated = await _attach_scrapes(result_dict, {"formats": ["markdown"]}, None, app_ctx)
+        assert "scrape" in updated["results"][0]
 
 
 class TestScrapeTool:

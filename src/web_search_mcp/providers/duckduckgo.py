@@ -70,14 +70,20 @@ class DuckDuckGoProvider:
         ddgs = self._create_ddgs()
 
         # Build search parameters
+        include_domains = kwargs.get("include_domains") or []
+        exclude_domains = kwargs.get("exclude_domains") or []
+        query_string = self._apply_domain_filters(query, include_domains, exclude_domains)
+
         region = kwargs.get("region", "wt-wt")
         safesearch = "moderate" if kwargs.get("safe_search", True) else "off"
         timelimit = kwargs.get("timelimit")  # d, w, m, y
+        if "time_range" in kwargs and kwargs["time_range"]:
+            timelimit = self._normalize_time_range(kwargs["time_range"]) or timelimit
 
         # DDG search is synchronous, run in executor
         def do_search() -> list[dict]:
             results = ddgs.text(
-                keywords=query,
+                keywords=query_string,
                 region=region,
                 safesearch=safesearch,
                 timelimit=timelimit,
@@ -129,3 +135,28 @@ class DuckDuckGoProvider:
                 continue
 
         return results
+
+    @staticmethod
+    def _normalize_time_range(value: str) -> str | None:
+        v = value.strip().lower()
+        mapping = {
+            "d": "d",
+            "day": "d",
+            "w": "w",
+            "week": "w",
+            "m": "m",
+            "month": "m",
+            "y": "y",
+            "year": "y",
+        }
+        return mapping.get(v)
+
+    @staticmethod
+    def _apply_domain_filters(query: str, include_domains: list[str], exclude_domains: list[str]) -> str:
+        terms = [query]
+        if include_domains:
+            include_expr = " OR ".join(f"site:{domain}" for domain in include_domains)
+            terms.append(f"({include_expr})")
+        if exclude_domains:
+            terms.extend(f"-site:{domain}" for domain in exclude_domains)
+        return " ".join(t for t in terms if t)

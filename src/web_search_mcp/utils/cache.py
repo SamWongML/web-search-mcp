@@ -190,16 +190,48 @@ class ResponseCache:
         Returns:
             SHA256 hash of the parameters
         """
+        # Normalize list values for stable ordering
+        normalized: dict[str, Any] = {}
+        for key, value in kwargs.items():
+            if isinstance(value, list):
+                try:
+                    normalized[key] = sorted(value)
+                except TypeError:
+                    normalized[key] = sorted(str(v) for v in value)
+            else:
+                normalized[key] = value
+
         # Sort keys for consistent ordering
-        sorted_items = sorted(kwargs.items())
+        sorted_items = sorted(normalized.items())
         key_string = f"{prefix}:" + json.dumps(sorted_items, sort_keys=True)
         return hashlib.sha256(key_string.encode()).hexdigest()
+
+    @staticmethod
+    def _wrap_response(response: dict[str, Any]) -> dict[str, Any]:
+        return {"_cached_at": time.time(), "data": response}
+
+    @staticmethod
+    def _unwrap_response(entry: dict[str, Any]) -> dict[str, Any]:
+        if "data" in entry and "_cached_at" in entry:
+            return entry["data"]
+        return entry
+
+    @staticmethod
+    def _is_fresh(entry: dict[str, Any], max_age_seconds: int | None) -> bool:
+        if max_age_seconds is None:
+            return True
+        cached_at = entry.get("_cached_at")
+        if cached_at is None:
+            return True
+        return (time.time() - float(cached_at)) <= max_age_seconds
 
     async def get_search(
         self,
         query: str,
         max_results: int,
         provider: str | None = None,
+        max_age_seconds: int | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any] | None:
         """
         Get cached search results.
@@ -220,8 +252,14 @@ class ResponseCache:
             query=query.lower().strip(),
             max_results=max_results,
             provider=provider,
+            **kwargs,
         )
-        return await self._cache.get(key)
+        entry = await self._cache.get(key)
+        if not entry:
+            return None
+        if not self._is_fresh(entry, max_age_seconds):
+            return None
+        return self._unwrap_response(entry)
 
     async def set_search(
         self,
@@ -229,6 +267,7 @@ class ResponseCache:
         max_results: int,
         response: dict[str, Any],
         provider: str | None = None,
+        **kwargs: Any,
     ) -> None:
         """
         Cache search results.
@@ -247,10 +286,16 @@ class ResponseCache:
             query=query.lower().strip(),
             max_results=max_results,
             provider=provider,
+            **kwargs,
         )
-        await self._cache.set(key, response)
+        await self._cache.set(key, self._wrap_response(response))
 
-    async def get_scrape(self, url: str) -> dict[str, Any] | None:
+    async def get_scrape(
+        self,
+        url: str,
+        max_age_seconds: int | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any] | None:
         """
         Get cached scrape result.
 
@@ -263,10 +308,15 @@ class ResponseCache:
         if not self.enabled:
             return None
 
-        key = self._generate_key("scrape", url=url.lower().strip())
-        return await self._cache.get(key)
+        key = self._generate_key("scrape", url=url.lower().strip(), **kwargs)
+        entry = await self._cache.get(key)
+        if not entry:
+            return None
+        if not self._is_fresh(entry, max_age_seconds):
+            return None
+        return self._unwrap_response(entry)
 
-    async def set_scrape(self, url: str, response: dict[str, Any]) -> None:
+    async def set_scrape(self, url: str, response: dict[str, Any], **kwargs: Any) -> None:
         """
         Cache scrape result.
 
@@ -277,8 +327,8 @@ class ResponseCache:
         if not self.enabled:
             return
 
-        key = self._generate_key("scrape", url=url.lower().strip())
-        await self._cache.set(key, response)
+        key = self._generate_key("scrape", url=url.lower().strip(), **kwargs)
+        await self._cache.set(key, self._wrap_response(response))
 
     async def clear(self) -> None:
         """Clear all cached entries."""

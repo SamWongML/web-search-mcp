@@ -7,7 +7,9 @@ from web_search_mcp.utils.markdown import (
     extract_title_from_markdown,
     format_metadata_as_markdown,
     html_to_markdown_simple,
+    markdown_to_text,
     truncate_markdown,
+    truncate_text,
 )
 
 
@@ -54,6 +56,37 @@ class TestTruncateMarkdown:
         assert "Paragraph 1" in result
         assert "[Content truncated...]" in result
 
+    def test_truncation_prefers_paragraph_boundary(self):
+        """Test paragraph boundary selection when near the limit."""
+        text = "Para 1\n\n" + ("A" * 200)
+        result = truncate_markdown(text, max_chars=80)
+        assert result.endswith("[Content truncated...]")
+        assert "Para 1" in result
+
+
+class TestTruncateText:
+    """Tests for truncate_text function."""
+
+    def test_no_truncation_needed(self):
+        """Test that short text is not truncated."""
+        text = "Short text"
+        result = truncate_text(text, max_chars=100)
+        assert result == text
+
+    def test_truncation_with_notice(self):
+        """Test that truncation notice is added."""
+        text = "A" * 100
+        result = truncate_text(text, max_chars=50)
+        assert len(result) < 100
+        assert "[Content truncated...]" in result
+
+    def test_truncation_breaks_on_newline(self):
+        """Test truncation prefers newline boundary."""
+        text = ("A" * 90) + "\n" + ("B" * 50)
+        result = truncate_text(text, max_chars=100)
+        assert result.endswith("[Content truncated...]")
+        assert "B" not in result.split("[Content truncated...]")[0]
+
     def test_truncation_with_notice(self):
         """Test that truncation notice is added."""
         text = "A" * 100
@@ -82,6 +115,21 @@ class TestExtractTitleFromMarkdown:
         markdown = "Just some content without a heading"
         title = extract_title_from_markdown(markdown)
         assert title is None
+
+
+class TestMarkdownToText:
+    """Tests for markdown_to_text function."""
+
+    def test_strips_markdown(self):
+        """Test basic markdown is stripped to text."""
+        markdown = "# Title\n\nThis is **bold** and a [link](https://example.com)."
+        text = markdown_to_text(markdown)
+        assert "Title" in text
+        assert "bold" in text
+        assert "https://example.com" not in text
+
+    def test_empty_markdown_returns_empty(self):
+        assert markdown_to_text("") == ""
 
     def test_h2_not_extracted(self):
         """Test that H2 is not extracted as title."""

@@ -102,3 +102,29 @@ class TestSerpAPIProvider:
 
         unconfigured = SerpAPIProvider(api_key=None)
         assert await unconfigured.is_available() is False
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_search_with_filters(self, provider, sample_serpapi_response):
+        """Test search with domain and time filters."""
+        route = respx.get("https://serpapi.com/search").mock(
+            return_value=Response(200, json=sample_serpapi_response)
+        )
+
+        await provider.search(
+            "python",
+            max_results=5,
+            include_domains=["example.com"],
+            exclude_domains=["ads.example.com"],
+            time_range="week",
+            location="San Francisco",
+            country="us",
+        )
+
+        request = route.calls[0].request
+        params = dict(request.url.params)
+        assert "site:example.com" in params["q"]
+        assert "-site:ads.example.com" in params["q"]
+        assert params["tbs"] == "qdr:w"
+        assert params["location"] == "San Francisco"
+        assert params["gl"] == "us"

@@ -92,6 +92,10 @@ class BraveProvider:
         should_close = self._owns_client and self._http_client is None
 
         try:
+            include_domains = kwargs.get("include_domains") or []
+            exclude_domains = kwargs.get("exclude_domains") or []
+            query_string = self._apply_domain_filters(query, include_domains, exclude_domains)
+
             headers = {
                 "Accept": "application/json",
                 "Accept-Encoding": "gzip",
@@ -99,7 +103,7 @@ class BraveProvider:
             }
 
             params = {
-                "q": query,
+                "q": query_string,
                 "count": min(max_results, 20),  # Brave max is 20
             }
 
@@ -108,6 +112,8 @@ class BraveProvider:
                 params["search_lang"] = kwargs["language"]
             if "region" in kwargs:
                 params["country"] = kwargs["region"]
+            if "country" in kwargs and "region" not in kwargs:
+                params["country"] = kwargs["country"]
             if kwargs.get("safe_search", True):
                 params["safesearch"] = "moderate"
             else:
@@ -144,6 +150,16 @@ class BraveProvider:
         finally:
             if should_close and isinstance(client, httpx.AsyncClient):
                 await client.aclose()
+
+    @staticmethod
+    def _apply_domain_filters(query: str, include_domains: list[str], exclude_domains: list[str]) -> str:
+        terms = [query]
+        if include_domains:
+            include_expr = " OR ".join(f"site:{domain}" for domain in include_domains)
+            terms.append(f"({include_expr})")
+        if exclude_domains:
+            terms.extend(f"-site:{domain}" for domain in exclude_domains)
+        return " ".join(t for t in terms if t)
 
     def _parse_results(self, data: dict, max_results: int) -> list[SearchResult]:
         """Parse Brave Search response into SearchResult objects."""

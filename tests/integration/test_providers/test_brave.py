@@ -87,3 +87,25 @@ class TestBraveProvider:
     async def test_provider_name(self, provider):
         """Test provider name property."""
         assert provider.name == "brave"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_search_with_domain_filters(self, provider, sample_brave_response):
+        """Test search query rewrite with domain filters."""
+        route = respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+            return_value=Response(200, json=sample_brave_response)
+        )
+
+        await provider.search(
+            "python",
+            max_results=5,
+            include_domains=["example.com"],
+            exclude_domains=["ads.example.com"],
+            country="us",
+        )
+
+        request = route.calls[0].request
+        params = dict(request.url.params)
+        assert "site:example.com" in params["q"]
+        assert "-site:ads.example.com" in params["q"]
+        assert params["country"] == "us"

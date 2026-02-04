@@ -8,7 +8,7 @@ import structlog
 from web_search_mcp.config import settings
 from web_search_mcp.models.common import Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
-from web_search_mcp.utils.markdown import clean_markdown
+from web_search_mcp.utils.markdown import clean_markdown, markdown_to_text, truncate_markdown, truncate_text
 
 logger = structlog.get_logger(__name__)
 
@@ -73,7 +73,7 @@ class JinaReaderScraper:
         Returns:
             ScrapeResult with markdown content
         """
-        options = options or ScrapeOptions()
+        options = (options or ScrapeOptions()).apply_defaults()
         start_time = time.monotonic()
 
         client = await self._get_client()
@@ -117,16 +117,36 @@ class JinaReaderScraper:
 
             content_data = data.get("data", {})
 
-            markdown = clean_markdown(content_data.get("content", ""))
+            formats = {f.strip().lower() for f in (options.formats or []) if f and f.strip()}
+            if not formats:
+                formats = {"markdown"}
 
-            metadata = Metadata(
-                title=content_data.get("title"),
-                description=content_data.get("description"),
-            )
+            markdown = clean_markdown(content_data.get("content", ""))
+            text: str | None = None
+            html_out: str | None = None
+
+            if "text" in formats:
+                text = markdown_to_text(markdown)
+
+            if options.max_length:
+                if markdown and "markdown" in formats:
+                    markdown = truncate_markdown(markdown, options.max_length)
+                if text:
+                    text = truncate_text(text, options.max_length)
+
+            metadata = Metadata()
+            if options.include_metadata:
+                metadata = Metadata(
+                    title=content_data.get("title"),
+                    description=content_data.get("description"),
+                )
 
             return ScrapeResult(
                 url=url,
-                markdown=markdown,
+                markdown=markdown if "markdown" in formats else "",
+                text=text,
+                html=html_out,
+                raw_html=None,
                 metadata=metadata,
                 scrape_time_ms=elapsed_ms,
                 success=True,
@@ -186,6 +206,8 @@ class JinaReaderScraper:
         self,
         base_url: str,
         max_urls: int = 100,
+        same_domain_only: bool = True,
+        include_subdomains: bool = False,
     ) -> DiscoverResult:
         """
         Discover URLs on a website.
@@ -220,7 +242,17 @@ class JinaReaderScraper:
             for link in result.links:
                 try:
                     link_domain = urlparse(link.url).netloc
-                    if link_domain == base_domain and link.url not in discovered:
+                    if same_domain_only:
+                        if include_subdomains:
+                            is_match = link_domain == base_domain or link_domain.endswith(
+                                f".{base_domain}"
+                            )
+                        else:
+                            is_match = link_domain == base_domain
+                    else:
+                        is_match = True
+
+                    if is_match and link.url not in discovered:
                         discovered.append(link.url)
                         if len(discovered) >= max_urls:
                             break

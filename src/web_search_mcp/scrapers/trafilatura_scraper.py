@@ -12,7 +12,8 @@ from web_search_mcp.config import settings
 from web_search_mcp.exceptions import ScraperContentError
 from web_search_mcp.models.common import Image, Link, Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
-from web_search_mcp.utils.markdown import clean_markdown
+from web_search_mcp.utils.content_extractor import extract_main_content, extract_metadata
+from web_search_mcp.utils.markdown import clean_markdown, markdown_to_text, truncate_markdown, truncate_text
 
 logger = structlog.get_logger(__name__)
 
@@ -61,6 +62,80 @@ class TrafilaturaScraper:
             verify=settings.get_ssl_context(),
         )
 
+    @staticmethod
+    def _normalize_formats(formats: list[str] | None) -> set[str]:
+        if not formats:
+            return {"markdown"}
+        return {f.strip().lower() for f in formats if f and f.strip()}
+
+    def _build_content(
+        self,
+        html: str,
+        url: str,
+        options: ScrapeOptions,
+    ) -> tuple[str, str | None, str | None]:
+        formats = self._normalize_formats(options.formats)
+        want_markdown = "markdown" in formats
+        want_text = "text" in formats
+        want_html = "html" in formats
+
+        markdown = ""
+        text: str | None = None
+        html_out: str | None = None
+
+        if want_markdown:
+            markdown = extract_main_content(
+                html,
+                url=url,
+                include_links=options.include_links,
+                include_images=options.include_images,
+                include_tables=True,
+                favor_precision=True,
+                only_main_content=bool(options.only_main_content),
+                include_selectors=options.include_tags,
+                exclude_selectors=options.exclude_tags,
+                output_format="markdown",
+            )
+
+        if want_text:
+            if markdown:
+                text = markdown_to_text(markdown)
+            else:
+                text = extract_main_content(
+                    html,
+                    url=url,
+                    include_links=options.include_links,
+                    include_images=options.include_images,
+                    include_tables=True,
+                    favor_precision=True,
+                    only_main_content=bool(options.only_main_content),
+                    include_selectors=options.include_tags,
+                    exclude_selectors=options.exclude_tags,
+                    output_format="text",
+                )
+
+        if want_html:
+            html_out = extract_main_content(
+                html,
+                url=url,
+                include_links=options.include_links,
+                include_images=options.include_images,
+                include_tables=True,
+                favor_precision=True,
+                only_main_content=bool(options.only_main_content),
+                include_selectors=options.include_tags,
+                exclude_selectors=options.exclude_tags,
+                output_format="html",
+            )
+
+        if options.max_length:
+            if markdown:
+                markdown = truncate_markdown(markdown, options.max_length)
+            if text:
+                text = truncate_text(text, options.max_length)
+
+        return markdown, text, html_out
+
     async def scrape(
         self,
         url: str,
@@ -76,7 +151,7 @@ class TrafilaturaScraper:
         Returns:
             ScrapeResult with markdown content
         """
-        options = options or ScrapeOptions()
+        options = (options or ScrapeOptions()).apply_defaults()
         start_time = time.monotonic()
 
         try:
@@ -100,8 +175,23 @@ class TrafilaturaScraper:
                 if should_close:
                     await client.aclose()
 
-            # Extract content using trafilatura
-            markdown, metadata = await self._extract_content(html, url, options)
+            formats = self._normalize_formats(options.formats)
+
+            # Extract content using shared content extractor
+            markdown, text, html_out = self._build_content(html, url, options)
+
+            # Extract metadata if requested
+            metadata = Metadata()
+            if options.include_metadata:
+                meta_dict = extract_metadata(html, url)
+                if meta_dict:
+                    metadata = Metadata(
+                        title=meta_dict.get("title"),
+                        description=meta_dict.get("description"),
+                        author=meta_dict.get("author"),
+                        site_name=meta_dict.get("sitename"),
+                        language=meta_dict.get("language"),
+                    )
 
             # Extract links if requested
             links: list[Link] = []
@@ -115,9 +205,14 @@ class TrafilaturaScraper:
 
             elapsed_ms = (time.monotonic() - start_time) * 1000
 
+            raw_html = html if "raw_html" in formats else None
+
             return ScrapeResult(
                 url=url,
                 markdown=markdown,
+                text=text,
+                html=html_out,
+                raw_html=raw_html,
                 metadata=metadata,
                 links=links,
                 images=images,
@@ -283,6 +378,8 @@ class TrafilaturaScraper:
         self,
         base_url: str,
         max_urls: int = 100,
+        same_domain_only: bool = True,
+        include_subdomains: bool = False,
     ) -> DiscoverResult:
         """
         Discover URLs on a website.
@@ -309,7 +406,17 @@ class TrafilaturaScraper:
 
             for link in result.links:
                 link_domain = urlparse(link.url).netloc
-                if link_domain == base_domain and link.url not in discovered:
+                if same_domain_only:
+                    if include_subdomains:
+                        is_match = link_domain == base_domain or link_domain.endswith(
+                            f".{base_domain}"
+                        )
+                    else:
+                        is_match = link_domain == base_domain
+                else:
+                    is_match = True
+
+                if is_match and link.url not in discovered:
                     discovered.append(link.url)
                     if len(discovered) >= max_urls:
                         break

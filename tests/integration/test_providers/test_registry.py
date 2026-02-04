@@ -162,6 +162,11 @@ class TestProviderRegistry:
         assert "serpapi" in registry.available_providers
         assert "duckduckgo" in registry.available_providers
 
+    def test_providers_property(self, mock_serpapi, mock_duckduckgo):
+        """Test providers property."""
+        registry = ProviderRegistry([mock_serpapi, mock_duckduckgo])
+        assert registry.providers == [mock_serpapi, mock_duckduckgo]
+
     def test_get_provider(self, mock_serpapi, mock_duckduckgo):
         """Test get_provider method."""
         registry = ProviderRegistry([mock_serpapi, mock_duckduckgo])
@@ -183,6 +188,27 @@ class TestProviderRegistry:
     async def test_empty_registry(self):
         """Test error with empty registry."""
         registry = ProviderRegistry([])
+
+        with pytest.raises(AllProvidersExhaustedError):
+            await registry.search("test")
+
+    @pytest.mark.asyncio
+    async def test_skips_provider_on_backoff(self, mock_serpapi):
+        """Test providers are skipped during backoff."""
+        import time
+
+        registry = ProviderRegistry([mock_serpapi])
+        registry._provider_status[mock_serpapi.name]["failures"] = 1
+        registry._provider_status[mock_serpapi.name]["last_failure"] = time.time()
+
+        with pytest.raises(AllProvidersExhaustedError):
+            await registry.search("test")
+
+    @pytest.mark.asyncio
+    async def test_unexpected_provider_error(self, mock_serpapi):
+        """Test unexpected exceptions are handled."""
+        mock_serpapi.search.side_effect = RuntimeError("boom")
+        registry = ProviderRegistry([mock_serpapi])
 
         with pytest.raises(AllProvidersExhaustedError):
             await registry.search("test")

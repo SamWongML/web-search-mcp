@@ -16,7 +16,7 @@ The extraction pipeline:
 
 import contextlib
 import re
-from typing import Literal
+from typing import Iterable, Literal
 from urllib.parse import urljoin, urlparse
 
 import structlog
@@ -149,9 +149,11 @@ def extract_main_content(
     include_links: bool = True,
     include_images: bool = False,
     include_tables: bool = True,
-    output_format: Literal["markdown", "text"] = "markdown",
+    output_format: Literal["markdown", "text", "html"] = "markdown",
     favor_precision: bool = True,
     only_main_content: bool = True,
+    include_selectors: Iterable[str] | None = None,
+    exclude_selectors: Iterable[str] | None = None,
 ) -> str:
     """
     Extract main content from HTML and convert to clean markdown.
@@ -170,9 +172,11 @@ def extract_main_content(
         include_links: Whether to preserve hyperlinks
         include_images: Whether to include image references
         include_tables: Whether to include tables
-        output_format: Output format ("markdown" or "text")
+        output_format: Output format ("markdown", "text", or "html")
         favor_precision: If True, be more aggressive about removing noise
         only_main_content: If True, remove non-main content elements (Firecrawl-style)
+        include_selectors: CSS selectors to force-include
+        exclude_selectors: CSS selectors to remove
 
     Returns:
         Clean markdown content optimized for LLM consumption
@@ -181,22 +185,30 @@ def extract_main_content(
         return ""
 
     # Step 1: Preprocess HTML to remove unwanted elements (like Firecrawl)
-    if only_main_content:
-        html = _preprocess_html(html, url)
+    if only_main_content or include_selectors or exclude_selectors:
+        html = _preprocess_html(
+            html,
+            url,
+            include_selectors=include_selectors,
+            exclude_selectors=exclude_selectors,
+        )
 
     # Step 2: Try trafilatura first (best quality for most sites)
-    markdown = _extract_with_trafilatura(
-        html,
-        url=url,
-        include_links=include_links,
-        include_images=include_images,
-        include_tables=include_tables,
-        output_format=output_format,
-        favor_precision=favor_precision,
-    )
+    if output_format == "html":
+        markdown = _extract_html_with_readability(html)
+    else:
+        markdown = _extract_with_trafilatura(
+            html,
+            url=url,
+            include_links=include_links,
+            include_images=include_images,
+            include_tables=include_tables,
+            output_format=output_format,
+            favor_precision=favor_precision,
+        )
 
     # Step 3: Fall back to readability if trafilatura returns empty or very short content
-    if not markdown or len(markdown.strip()) < 100:
+    if output_format != "html" and (not markdown or len(markdown.strip()) < 100):
         logger.debug("trafilatura_fallback", reason="short_content", length=len(markdown or ""))
         markdown = _extract_with_readability(
             html,
@@ -205,12 +217,18 @@ def extract_main_content(
         )
 
     # Step 4: Apply post-processing
-    markdown = _postprocess_markdown(markdown, base_url=url)
+    if output_format != "html":
+        markdown = _postprocess_markdown(markdown, base_url=url)
 
     return markdown
 
 
-def _preprocess_html(html: str, url: str | None = None) -> str:
+def _preprocess_html(
+    html: str,
+    url: str | None = None,
+    include_selectors: Iterable[str] | None = None,
+    exclude_selectors: Iterable[str] | None = None,
+) -> str:
     """
     Preprocess HTML by removing unwanted elements before content extraction.
 
@@ -233,6 +251,10 @@ def _preprocess_html(html: str, url: str | None = None) -> str:
     try:
         soup = BeautifulSoup(html, "html.parser")
 
+        include_selectors_list = _normalize_selectors(include_selectors)
+        exclude_selectors_list = _normalize_selectors(exclude_selectors)
+        include_ids = _collect_selector_ids(soup, include_selectors_list)
+
         # Remove script, style, noscript, meta, head (like Firecrawl)
         for tag in soup.find_all(["script", "style", "noscript", "meta"]):
             tag.decompose()
@@ -245,12 +267,12 @@ def _preprocess_html(html: str, url: str | None = None) -> str:
                     # Class selector
                     for el in soup.find_all(class_=selector[1:]):
                         # Check if element contains force-include content
-                        if not _contains_main_content(el):
+                        if not _contains_main_content(el, include_ids):
                             el.decompose()
                 elif selector.startswith("#"):
                     # ID selector
                     el = soup.find(id=selector[1:])
-                    if el and not _contains_main_content(el):
+                    if el and not _contains_main_content(el, include_ids):
                         el.decompose()
                 elif selector.startswith("["):
                     # Attribute selector - skip for now
@@ -258,10 +280,19 @@ def _preprocess_html(html: str, url: str | None = None) -> str:
                 else:
                     # Tag selector
                     for el in soup.find_all(selector):
-                        if not _contains_main_content(el):
+                        if not _contains_main_content(el, include_ids):
                             el.decompose()
             except Exception as e:
                 logger.debug("selector_error", selector=selector, error=str(e))
+
+        # Apply custom exclude selectors
+        for selector in exclude_selectors_list:
+            try:
+                for el in soup.select(selector):
+                    if not _contains_main_content(el, include_ids):
+                        el.decompose()
+            except Exception as e:
+                logger.debug("custom_selector_error", selector=selector, error=str(e))
 
         # Make image URLs absolute (like Firecrawl)
         if url:
@@ -280,9 +311,12 @@ def _preprocess_html(html: str, url: str | None = None) -> str:
         return html
 
 
-def _contains_main_content(element) -> bool:
+def _contains_main_content(element, include_ids: set[int]) -> bool:
     """Check if an element contains main content that should be preserved."""
     try:
+        if _contains_included_element(element, include_ids):
+            return True
+
         # Check if element has any of the force-include classes/ids
         element_classes = element.get("class", [])
         if isinstance(element_classes, str):
@@ -321,6 +355,34 @@ def _contains_main_content(element) -> bool:
         return False
     except Exception:
         return False
+
+
+def _normalize_selectors(selectors: Iterable[str] | None) -> list[str]:
+    if not selectors:
+        return []
+    return [s.strip() for s in selectors if s and s.strip()]
+
+
+def _collect_selector_ids(soup, selectors: list[str]) -> set[int]:
+    include_ids: set[int] = set()
+    for selector in selectors:
+        try:
+            for el in soup.select(selector):
+                include_ids.add(id(el))
+        except Exception:
+            continue
+    return include_ids
+
+
+def _contains_included_element(element, include_ids: set[int]) -> bool:
+    if not include_ids:
+        return False
+    if id(element) in include_ids:
+        return True
+    for child in element.descendants:
+        if id(child) in include_ids:
+            return True
+    return False
 
 
 def _extract_with_trafilatura(
@@ -397,6 +459,21 @@ def _extract_with_readability(
     except Exception as e:
         logger.warning("readability_error", error=str(e))
         return ""
+
+
+def _extract_html_with_readability(html: str) -> str:
+    """Extract main content HTML using readability."""
+    try:
+        from readability import Document
+
+        doc = Document(html)
+        return doc.summary() or ""
+    except ImportError:
+        logger.warning("readability_not_installed")
+        return html
+    except Exception as e:
+        logger.warning("readability_html_error", error=str(e))
+        return html
 
 
 def _postprocess_markdown(markdown: str, base_url: str | None = None) -> str:
