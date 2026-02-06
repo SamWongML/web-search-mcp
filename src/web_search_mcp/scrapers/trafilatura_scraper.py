@@ -13,7 +13,12 @@ from web_search_mcp.exceptions import ScraperContentError
 from web_search_mcp.models.common import Image, Link, Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
 from web_search_mcp.utils.content_extractor import extract_main_content, extract_metadata
-from web_search_mcp.utils.markdown import clean_markdown, markdown_to_text, truncate_markdown, truncate_text
+from web_search_mcp.utils.markdown import (
+    clean_markdown,
+    markdown_to_text,
+    truncate_markdown,
+    truncate_text,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -63,7 +68,7 @@ class TrafilaturaScraper:
         )
 
     @staticmethod
-    def _normalize_formats(formats: list[str] | None) -> set[str]:
+    def _normalize_formats(formats: list[Any] | None) -> set[str]:
         if not formats:
             return {"markdown"}
         return {f.strip().lower() for f in formats if f and f.strip()}
@@ -256,14 +261,14 @@ class TrafilaturaScraper:
                     # Try dataclass asdict first (trafilatura 2.0+)
                     from dataclasses import asdict
 
-                    meta_dict = asdict(metadata)
+                    meta_dict = asdict(metadata)  # type: ignore[call-overload]
                 except (TypeError, ImportError):
                     # Fall back to __dict__ for older versions
-                    if hasattr(metadata, "__dict__"):
-                        meta_dict = metadata.__dict__
-                    elif hasattr(metadata, "_asdict"):
-                        meta_dict = metadata._asdict()
-
+                    meta_dict = (
+                        metadata.__dict__
+                        if hasattr(metadata, "__dict__")
+                        else (metadata._asdict() if hasattr(metadata, "_asdict") else None)
+                    )
             return text, meta_dict
 
         # Run in executor (trafilatura is synchronous)

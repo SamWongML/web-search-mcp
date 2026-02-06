@@ -105,5 +105,11 @@ module = [
     "trafilatura.*",
     "html2text.*",
     "diskcache.*",
+    "markdownify.*",
 ]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "readability.*"
+ignore_errors = true
 ignore_missing_imports = true

@@ -16,7 +16,8 @@ The extraction pipeline:
 
 import contextlib
 import re
-from typing import Iterable, Literal
+from collections.abc import Iterable
+from typing import Any, Literal
 from urllib.parse import urljoin, urlparse
 
 import structlog
@@ -271,8 +272,12 @@ def _preprocess_html(
                             el.decompose()
                 elif selector.startswith("#"):
                     # ID selector
-                    el = soup.find(id=selector[1:])
-                    if el and not _contains_main_content(el, include_ids):
+                    el = soup.find(id=selector[1:])  # type: ignore[assignment]
+                    if (
+                        el
+                        and hasattr(el, "decompose")
+                        and not _contains_main_content(el, include_ids)
+                    ):
                         el.decompose()
                 elif selector.startswith("["):
                     # Attribute selector - skip for now
@@ -298,11 +303,15 @@ def _preprocess_html(
         if url:
             for img in soup.find_all("img", src=True):
                 with contextlib.suppress(Exception):
-                    img["src"] = urljoin(url, img["src"])
+                    src = img["src"]
+                    if isinstance(src, str):
+                        img["src"] = urljoin(url, src)
 
             for a in soup.find_all("a", href=True):
                 with contextlib.suppress(Exception):
-                    a["href"] = urljoin(url, a["href"])
+                    href = a["href"]
+                    if isinstance(href, str):
+                        a["href"] = urljoin(url, href)
 
         return str(soup)
 
@@ -311,7 +320,7 @@ def _preprocess_html(
         return html
 
 
-def _contains_main_content(element, include_ids: set[int]) -> bool:
+def _contains_main_content(element: Any, include_ids: set[int]) -> bool:
     """Check if an element contains main content that should be preserved."""
     try:
         if _contains_included_element(element, include_ids):
@@ -363,7 +372,7 @@ def _normalize_selectors(selectors: Iterable[str] | None) -> list[str]:
     return [s.strip() for s in selectors if s and s.strip()]
 
 
-def _collect_selector_ids(soup, selectors: list[str]) -> set[int]:
+def _collect_selector_ids(soup: Any, selectors: list[str]) -> set[int]:
     include_ids: set[int] = set()
     for selector in selectors:
         try:
@@ -374,15 +383,12 @@ def _collect_selector_ids(soup, selectors: list[str]) -> set[int]:
     return include_ids
 
 
-def _contains_included_element(element, include_ids: set[int]) -> bool:
+def _contains_included_element(element: Any, include_ids: set[int]) -> bool:
     if not include_ids:
         return False
     if id(element) in include_ids:
         return True
-    for child in element.descendants:
-        if id(child) in include_ids:
-            return True
-    return False
+    return any(id(child) in include_ids for child in element.descendants)
 
 
 def _extract_with_trafilatura(
@@ -467,7 +473,7 @@ def _extract_html_with_readability(html: str) -> str:
         from readability import Document
 
         doc = Document(html)
-        return doc.summary() or ""
+        return str(doc.summary()) or ""
     except ImportError:
         logger.warning("readability_not_installed")
         return html
@@ -566,13 +572,13 @@ def _make_urls_absolute(text: str, base_url: str) -> str:
     parsed_base = urlparse(base_url)
     base_origin = f"{parsed_base.scheme}://{parsed_base.netloc}"
 
-    def replace_url(match: re.Match) -> str:
+    def replace_url(match: re.Match[str]) -> str:
         link_text = match.group(1)
         url = match.group(2)
 
         # Skip if already absolute
         if url.startswith(("http://", "https://", "mailto:", "tel:", "#")):
-            return match.group(0)
+            return str(match.group(0))
 
         # Handle protocol-relative URLs
         if url.startswith("//"):

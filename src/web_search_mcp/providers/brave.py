@@ -96,13 +96,14 @@ class BraveProvider:
             exclude_domains = kwargs.get("exclude_domains") or []
             query_string = self._apply_domain_filters(query, include_domains, exclude_domains)
 
-            headers = {
+            headers: dict[str, str] = {
                 "Accept": "application/json",
                 "Accept-Encoding": "gzip",
-                "X-Subscription-Token": self._api_key,
             }
+            if self._api_key:
+                headers["X-Subscription-Token"] = self._api_key
 
-            params = {
+            params: dict[str, str | int] = {
                 "q": query_string,
                 "count": min(max_results, 20),  # Brave max is 20
             }
@@ -161,7 +162,7 @@ class BraveProvider:
             terms.extend(f"-site:{domain}" for domain in exclude_domains)
         return " ".join(t for t in terms if t)
 
-    def _parse_results(self, data: dict, max_results: int) -> list[SearchResult]:
+    def _parse_results(self, data: dict[str, Any], max_results: int) -> list[SearchResult]:
         """Parse Brave Search response into SearchResult objects."""
         results: list[SearchResult] = []
 

@@ -13,6 +13,7 @@ import structlog
 from mcp.server.fastmcp import FastMCP
 
 from web_search_mcp.config import settings
+from web_search_mcp.providers.base import SearchProvider
 from web_search_mcp.providers.registry import ProviderRegistry
 from web_search_mcp.scrapers.base import Scraper
 from web_search_mcp.tools import register_all_tools
@@ -33,7 +34,7 @@ class AppContext:
     cache: ResponseCache
 
 
-def create_providers(http_client: httpx.AsyncClient) -> list:
+def create_providers(http_client: httpx.AsyncClient) -> list[SearchProvider]:
     """
     Create search provider instances based on configuration.
 
@@ -48,7 +49,7 @@ def create_providers(http_client: httpx.AsyncClient) -> list:
     from web_search_mcp.providers.serpapi import SerpAPIProvider
     from web_search_mcp.providers.tavily import TavilyProvider
 
-    providers = []
+    providers: list[SearchProvider] = []
 
     # Add providers in priority order
     # Tavily first (high quality AI-optimized search)

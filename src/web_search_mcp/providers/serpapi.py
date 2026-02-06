@@ -173,7 +173,7 @@ class SerpAPIProvider:
         }
         return mapping.get(v)
 
-    def _parse_results(self, data: dict, max_results: int) -> list[SearchResult]:
+    def _parse_results(self, data: dict[str, Any], max_results: int) -> list[SearchResult]:
         """Parse SerpAPI response into SearchResult objects."""
         results: list[SearchResult] = []
 

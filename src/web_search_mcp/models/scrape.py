@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from web_search_mcp.models.common import Image, Link, Metadata
 
@@ -20,8 +20,18 @@ class ScrapeOptions(BaseModel):
     use_browser: bool = Field(default=True, description="Use browser-based scraping")
     formats: list[Literal["markdown", "text", "html", "raw_html"]] | None = Field(
         default=None,
-        description="Output formats to include (default uses server setting)",
+        description="Output formats as a list, e.g. ['markdown'] or ['markdown', 'html']",
     )
+
+    @field_validator("formats", mode="before")
+    @classmethod
+    def normalize_formats(cls, v: str | list[str] | None) -> list[str] | None:
+        """Accept string or list, normalize to list."""
+        if v is None:
+            return v
+        if isinstance(v, str):
+            return [v]
+        return v
     only_main_content: bool | None = Field(
         default=None,
         description="Return only main content (default uses server setting)",

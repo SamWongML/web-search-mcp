@@ -3,10 +3,20 @@
 import time
 
 import structlog
+from web_search_mcp.exceptions import ScraperContentError
+from typing import Any, Iterable, Literal, TYPE_CHECKING
 from web_search_mcp.models.common import Image, Link, Metadata
 from web_search_mcp.models.scrape import DiscoverResult, ScrapeOptions, ScrapeResult
+
+if TYPE_CHECKING:
+    from web_search_mcp.server import AppContext
 from web_search_mcp.utils.content_extractor import extract_main_content
-from web_search_mcp.utils.markdown import clean_markdown, markdown_to_text, truncate_markdown, truncate_text
+from web_search_mcp.utils.markdown import (
+    clean_markdown,
+    markdown_to_text,
+    truncate_markdown,
+    truncate_text,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -61,7 +71,8 @@ class Crawl4AIScraper:
             )
 
             self._crawler = AsyncWebCrawler(config=browser_config)
-            await self._crawler.__aenter__()
+            if self._crawler:
+                await self._crawler.__aenter__()
             self._initialized = True
 
             logger.info("crawl4ai_initialized", headless=self._headless)
@@ -74,7 +85,7 @@ class Crawl4AIScraper:
             raise
 
     @staticmethod
-    def _normalize_formats(formats: list[str] | None) -> set[str]:
+    def _normalize_formats(formats: list[Any] | None) -> set[str]:
         if not formats:
             return {"markdown"}
         return {f.strip().lower() for f in formats if f and f.strip()}
@@ -192,6 +203,9 @@ class Crawl4AIScraper:
                     wait_until="domcontentloaded",
                     wait_for=options.wait_for_selector,
                 )
+
+            if not self._crawler:
+                raise ScraperContentError(url, "Crawler not initialized")
 
             result = await self._crawler.arun(url=url, config=run_config)
 
@@ -322,6 +336,9 @@ class Crawl4AIScraper:
                 check_interval=1.0,
             )
 
+            if not self._crawler:
+                raise ScraperContentError("batch", "Crawler not initialized")
+
             raw_results = await self._crawler.arun_many(
                 urls=urls,
                 config=run_config,
@@ -361,7 +378,11 @@ class Crawl4AIScraper:
 
                 # Build metadata
                 metadata = Metadata()
-                if options.include_metadata and hasattr(raw_result, "metadata") and raw_result.metadata:
+                if (
+                    options.include_metadata
+                    and hasattr(raw_result, "metadata")
+                    and raw_result.metadata
+                ):
                     metadata = Metadata(
                         title=raw_result.metadata.get("title"),
                         description=raw_result.metadata.get("description"),

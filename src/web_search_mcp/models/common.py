@@ -1,6 +1,7 @@
 """Common models shared across the application."""
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +46,6 @@ class ErrorDetail(BaseModel):
 
     code: str
     message: str
-    details: dict | None = None
+    details: dict[str, Any] | None = None
 
     model_config = {"extra": "ignore"}

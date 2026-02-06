@@ -81,7 +81,7 @@ class DuckDuckGoProvider:
             timelimit = self._normalize_time_range(kwargs["time_range"]) or timelimit
 
         # DDG search is synchronous, run in executor
-        def do_search() -> list[dict]:
+        def do_search() -> list[dict[str, Any]]:
             results = ddgs.text(
                 keywords=query_string,
                 region=region,
@@ -113,7 +113,7 @@ class DuckDuckGoProvider:
             logger.warning("duckduckgo_error", error=str(e))
             raise ProviderAPIError(self.name, 500, str(e)) from e
 
-    def _parse_results(self, raw_results: list[dict], max_results: int) -> list[SearchResult]:
+    def _parse_results(self, raw_results: list[dict[str, Any]], max_results: int) -> list[SearchResult]:
         """Parse DuckDuckGo results into SearchResult objects."""
         results: list[SearchResult] = []
 

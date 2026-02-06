@@ -1,5 +1,6 @@
 """Batch scraping tool for MCP."""
 
+from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from web_search_mcp.models.scrape import BatchScrapeResult, ScrapeOptions
@@ -14,15 +15,15 @@ def register(mcp: FastMCP) -> None:
         max_concurrent: int = 5,
         include_links: bool = True,
         include_images: bool = False,
-        formats: list[str] | None = None,
+        formats: list[str] | str | None = None,
         only_main_content: bool | None = None,
         include_tags: list[str] | None = None,
         exclude_tags: list[str] | None = None,
         wait_for_selector: str | None = None,
         max_length: int | None = None,
         use_browser: bool = True,
-        ctx: Context = None,  # type: ignore[assignment]
-    ) -> dict:
+        ctx: Context[Any] = None,  # type: ignore[assignment, type-arg]
+    ) -> dict[str, Any]:
         """
         Scrape multiple URLs concurrently and return AI-friendly markdown content.
 
@@ -34,7 +35,8 @@ def register(mcp: FastMCP) -> None:
             max_concurrent: Maximum concurrent scrapes (1-10, default: 5)
             include_links: Extract links from pages (default: true)
             include_images: Extract images from pages (default: false)
-            formats: Output formats to include (e.g., ["markdown","text","html","raw_html"])
+            formats: Output formats as a LIST (e.g., ["markdown"] or ["markdown", "html"]).
+                     Valid: "markdown", "text", "html", "raw_html". Single string also accepted.
             only_main_content: Remove non-main content elements (default: true)
             include_tags: CSS selectors to force-include
             exclude_tags: CSS selectors to exclude

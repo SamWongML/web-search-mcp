@@ -1,7 +1,7 @@
 """URL mapping tool for MCP."""
 
 import re
-
+from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from web_search_mcp.models.scrape import DiscoverResult
@@ -18,8 +18,8 @@ def register(mcp: FastMCP) -> None:
         same_domain_only: bool = True,
         include_subdomains: bool = False,
         exclude_patterns: list[str] | None = None,
-        ctx: Context = None,  # type: ignore[assignment]
-    ) -> dict:
+        ctx: Context[Any] = None,  # type: ignore[assignment, type-arg]
+    ) -> dict[str, Any]:
         """
         Map URLs on a site with optional filters.
 

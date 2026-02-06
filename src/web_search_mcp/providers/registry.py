@@ -78,7 +78,7 @@ class ProviderRegistry:
         backoff_seconds = min(2**failures, 300)
         elapsed = time.time() - last_failure
 
-        return elapsed < backoff_seconds
+        return bool(elapsed < backoff_seconds)
 
     async def search(
         self,
@@ -188,8 +188,8 @@ class ProviderRegistry:
             return self._providers
 
         # Move preferred provider to front
-        ordered = []
-        rest = []
+        ordered: list[SearchProvider] = []
+        rest: list[SearchProvider] = []
 
         for provider in self._providers:
             if provider.name == preferred:

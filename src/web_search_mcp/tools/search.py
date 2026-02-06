@@ -1,4 +1,4 @@
-"""Web search tool for MCP."""
+from typing import Any, TYPE_CHECKING
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -6,13 +6,16 @@ from web_search_mcp.config import settings
 from web_search_mcp.models.scrape import ScrapeOptions, ScrapeResult
 from web_search_mcp.models.search import SearchResponse
 
+if TYPE_CHECKING:
+    from web_search_mcp.server import AppContext
+
 
 async def _attach_scrapes(
-    result_dict: dict,
-    scrape_opts: dict | ScrapeOptions,
+    result_dict: dict[str, Any],
+    scrape_opts: dict[str, Any] | ScrapeOptions,
     max_scrape_results: int | None,
     app_ctx: "AppContext",
-) -> dict:
+) -> dict[str, Any]:
     import anyio
 
     # Normalize scrape options
@@ -99,10 +102,10 @@ def register(mcp: FastMCP) -> None:
         exclude_domains: list[str] | None = None,
         search_depth: str | None = None,
         topic: str | None = None,
-        scrape_options: dict | ScrapeOptions | None = None,
+        scrape_options: dict[str, Any] | ScrapeOptions | None = None,
         max_scrape_results: int | None = None,
-        ctx: Context = None,  # type: ignore[assignment]
-    ) -> dict:
+        ctx: Context = None,  # type: ignore[assignment, type-arg]
+    ) -> dict[str, Any]:
         """
         Search the web and return results with links, titles, and metadata.
 
@@ -154,7 +157,11 @@ def register(mcp: FastMCP) -> None:
         }
 
         # Check cache first
-        cached = await app_ctx.cache.get_search(query, max_results, **cache_params)
+        cached = await app_ctx.cache.get_search(
+            query,
+            max_results,
+            **cache_params,  # type: ignore[arg-type]
+        )
         if cached:
             cached["cached"] = True
             if scrape_options:
@@ -188,7 +195,12 @@ def register(mcp: FastMCP) -> None:
         result = response.model_dump()
 
         # Cache the result
-        await app_ctx.cache.set_search(query, max_results, result, **cache_params)
+        await app_ctx.cache.set_search(
+            query,
+            max_results,
+            result,
+            **cache_params,  # type: ignore[arg-type]
+        )
 
         # Attach scrapes if requested
         if scrape_options:

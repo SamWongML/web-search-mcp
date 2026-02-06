@@ -1,5 +1,6 @@
 """URL discovery tool for MCP."""
 
+from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from web_search_mcp.models.scrape import DiscoverResult
@@ -12,8 +13,8 @@ def register(mcp: FastMCP) -> None:
     async def discover_urls(
         url: str,
         max_urls: int = 100,
-        ctx: Context = None,  # type: ignore[assignment]
-    ) -> dict:
+        ctx: Context[Any] = None,  # type: ignore[assignment, type-arg]
+    ) -> dict[str, Any]:
         """
         Discover all URLs on a website starting from a base URL.
 

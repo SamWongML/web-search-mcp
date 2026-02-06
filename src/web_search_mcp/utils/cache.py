@@ -213,7 +213,9 @@ class ResponseCache:
     @staticmethod
     def _unwrap_response(entry: dict[str, Any]) -> dict[str, Any]:
         if "data" in entry and "_cached_at" in entry:
-            return entry["data"]
+            data = entry["data"]
+            if isinstance(data, dict):
+                return data
         return entry
 
     @staticmethod
